@@ -1,11 +1,26 @@
+type SceauIDFetchResponse = {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+};
+
+type SceauIDFetch = (
+  url: string,
+  init?: {
+    credentials?: "include" | "omit" | "same-origin";
+  }
+) => Promise<SceauIDFetchResponse>;
+
+declare const fetch: SceauIDFetch;
+
 export type SceauIDClientOptions = {
   baseUrl: string;
-  fetch?: typeof fetch;
+  fetch?: SceauIDFetch;
 };
 
 export class SceauIDClient {
   private readonly baseUrl: string;
-  private readonly fetcher: typeof fetch;
+  private readonly fetcher: SceauIDFetch;
 
   constructor(options: SceauIDClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
