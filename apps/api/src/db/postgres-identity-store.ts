@@ -31,35 +31,7 @@ import {
   users
 } from "./schema.js";
 
-export class PostgresIdentityStore
-  implements
-    Pick<
-      IdentityStore,
-      | "createUser"
-      | "findUserById"
-      | "createEmailAddress"
-      | "findUserByEmail"
-      | "markEmailVerified"
-      | "createPasskeyCredential"
-      | "findPasskeyByCredentialId"
-      | "listPasskeysForUser"
-      | "updatePasskeyUsage"
-      | "revokePasskeyCredential"
-      | "createSession"
-      | "findSessionByTokenHash"
-      | "listSessionsForUser"
-      | "revokeSession"
-      | "revokeUserSessions"
-      | "createRecoveryCode"
-      | "findUnusedRecoveryCode"
-      | "markRecoveryCodeUsed"
-      | "createRecoveryRequest"
-      | "findActiveRecoveryRequest"
-      | "completeRecoveryRequest"
-      | "createSecurityEvent"
-      | "listSecurityEventsForUser"
-    >
-{
+export class PostgresIdentityStore implements IdentityStore {
   constructor(private readonly db: Database) {}
 
   async createUser(input: CreateUserInput) {
