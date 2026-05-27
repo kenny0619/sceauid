@@ -1,15 +1,16 @@
 import { eq } from "drizzle-orm";
-import { normalizeEmail, type UserId } from "../domain/identity.js";
+import { normalizeEmail, type SessionId, type UserId } from "../domain/identity.js";
 import type {
   CreateEmailAddressInput,
   CreatePasskeyCredentialInput,
+  CreateSessionInput,
   CreateUserInput,
   IdentityStore,
   UpdatePasskeyUsageInput
 } from "../domain/storage.js";
 import type { Database } from "./client.js";
-import { mapEmailAddress, mapPasskeyCredential, mapUser } from "./mappers.js";
-import { emailAddresses, passkeyCredentials, users } from "./schema.js";
+import { mapEmailAddress, mapPasskeyCredential, mapSession, mapUser } from "./mappers.js";
+import { emailAddresses, passkeyCredentials, sessions, users } from "./schema.js";
 
 export class PostgresIdentityStore
   implements
@@ -25,6 +26,11 @@ export class PostgresIdentityStore
       | "listPasskeysForUser"
       | "updatePasskeyUsage"
       | "revokePasskeyCredential"
+      | "createSession"
+      | "findSessionByTokenHash"
+      | "listSessionsForUser"
+      | "revokeSession"
+      | "revokeUserSessions"
     >
 {
   constructor(private readonly db: Database) {}
@@ -132,5 +138,45 @@ export class PostgresIdentityStore
       .update(passkeyCredentials)
       .set({ revokedAt })
       .where(eq(passkeyCredentials.credentialId, credentialId));
+  }
+
+  async createSession(input: CreateSessionInput) {
+    const [session] = await this.db
+      .insert(sessions)
+      .values({
+        userId: input.userId,
+        tokenHash: input.tokenHash,
+        deviceLabel: input.deviceLabel ?? null,
+        userAgent: input.userAgent ?? null,
+        ipHash: input.ipHash ?? null,
+        expiresAt: input.expiresAt
+      })
+      .returning();
+
+    return mapSession(session);
+  }
+
+  async findSessionByTokenHash(tokenHash: string) {
+    const [session] = await this.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.tokenHash, tokenHash))
+      .limit(1);
+
+    return session ? mapSession(session) : null;
+  }
+
+  async listSessionsForUser(userId: UserId) {
+    const rows = await this.db.select().from(sessions).where(eq(sessions.userId, userId));
+
+    return rows.map(mapSession);
+  }
+
+  async revokeSession(sessionId: SessionId, revokedAt: Date) {
+    await this.db.update(sessions).set({ revokedAt }).where(eq(sessions.id, sessionId));
+  }
+
+  async revokeUserSessions(userId: UserId, revokedAt: Date) {
+    await this.db.update(sessions).set({ revokedAt }).where(eq(sessions.userId, userId));
   }
 }
