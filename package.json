@@ -6,12 +6,15 @@
   "packageManager": "pnpm@10.2.1",
   "scripts": {
     "build": "turbo build",
+    "check": "biome check .",
+    "format": "biome format --write .",
     "dev": "turbo dev",
-    "lint": "turbo lint",
+    "lint": "turbo lint && biome check .",
     "test": "turbo test",
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   }
