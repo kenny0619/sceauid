@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignore": ["node_modules", "dist", ".turbo", "coverage"]
+    "ignore": ["node_modules", "dist", ".turbo", "coverage", "apps/api/drizzle"]
   },
   "formatter": {
     "enabled": true,

@@ -85,12 +85,8 @@
           "name": "email_addresses_user_id_users_id_fk",
           "tableFrom": "email_addresses",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -200,12 +196,8 @@
           "name": "passkey_credentials_user_id_users_id_fk",
           "tableFrom": "passkey_credentials",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -290,12 +282,8 @@
           "name": "recovery_codes_user_id_users_id_fk",
           "tableFrom": "recovery_codes",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -411,12 +399,8 @@
           "name": "recovery_requests_user_id_users_id_fk",
           "tableFrom": "recovery_requests",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -558,12 +542,8 @@
           "name": "security_events_user_id_users_id_fk",
           "tableFrom": "security_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -571,12 +551,8 @@
           "name": "security_events_actor_user_id_users_id_fk",
           "tableFrom": "security_events",
           "tableTo": "users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -584,12 +560,8 @@
           "name": "security_events_session_id_sessions_id_fk",
           "tableFrom": "security_events",
           "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -713,12 +685,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -782,31 +750,17 @@
     "public.recovery_request_status": {
       "name": "recovery_request_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "verified",
-        "completed",
-        "expired",
-        "cancelled"
-      ]
+      "values": ["pending", "verified", "completed", "expired", "cancelled"]
     },
     "public.risk_level": {
       "name": "risk_level",
       "schema": "public",
-      "values": [
-        "low",
-        "medium",
-        "high"
-      ]
+      "values": ["low", "medium", "high"]
     },
     "public.security_event_outcome": {
       "name": "security_event_outcome",
       "schema": "public",
-      "values": [
-        "success",
-        "failure",
-        "pending"
-      ]
+      "values": ["success", "failure", "pending"]
     },
     "public.security_event_type": {
       "name": "security_event_type",
@@ -831,11 +785,7 @@
     "public.user_status": {
       "name": "user_status",
       "schema": "public",
-      "values": [
-        "active",
-        "disabled",
-        "pending_recovery"
-      ]
+      "values": ["active", "disabled", "pending_recovery"]
     }
   },
   "schemas": {},
