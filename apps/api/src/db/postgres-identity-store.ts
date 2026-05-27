@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
-import { normalizeEmail, type SessionId, type UserId } from "../domain/identity.js";
+import { type SessionId, type UserId, normalizeEmail } from "../domain/identity.js";
 import type {
   CreateEmailAddressInput,
   CreatePasskeyCredentialInput,
