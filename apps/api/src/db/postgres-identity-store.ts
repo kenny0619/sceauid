@@ -1,10 +1,11 @@
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { normalizeEmail, type SessionId, type UserId } from "../domain/identity.js";
 import type {
   CreateEmailAddressInput,
   CreatePasskeyCredentialInput,
   CreateRecoveryCodeInput,
   CreateRecoveryRequestInput,
+  CreateSecurityEventInput,
   CreateSessionInput,
   CreateUserInput,
   IdentityStore,
@@ -16,6 +17,7 @@ import {
   mapPasskeyCredential,
   mapRecoveryCode,
   mapRecoveryRequest,
+  mapSecurityEvent,
   mapSession,
   mapUser
 } from "./mappers.js";
@@ -24,6 +26,7 @@ import {
   passkeyCredentials,
   recoveryCodes,
   recoveryRequests,
+  securityEvents,
   sessions,
   users
 } from "./schema.js";
@@ -53,6 +56,8 @@ export class PostgresIdentityStore
       | "createRecoveryRequest"
       | "findActiveRecoveryRequest"
       | "completeRecoveryRequest"
+      | "createSecurityEvent"
+      | "listSecurityEventsForUser"
     >
 {
   constructor(private readonly db: Database) {}
@@ -274,5 +279,34 @@ export class PostgresIdentityStore
         completedAt
       })
       .where(and(eq(recoveryRequests.userId, userId), eq(recoveryRequests.status, "pending")));
+  }
+
+  async createSecurityEvent(input: CreateSecurityEventInput) {
+    const [event] = await this.db
+      .insert(securityEvents)
+      .values({
+        userId: input.userId,
+        actorUserId: input.actorUserId,
+        sessionId: input.sessionId,
+        eventType: input.eventType,
+        outcome: input.outcome,
+        riskLevel: input.riskLevel,
+        metadata: input.metadata,
+        context: input.context
+      })
+      .returning();
+
+    return mapSecurityEvent(event);
+  }
+
+  async listSecurityEventsForUser(userId: UserId, limit: number) {
+    const events = await this.db
+      .select()
+      .from(securityEvents)
+      .where(eq(securityEvents.userId, userId))
+      .orderBy(desc(securityEvents.createdAt))
+      .limit(limit);
+
+    return events.map(mapSecurityEvent);
   }
 }
