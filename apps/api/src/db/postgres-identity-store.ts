@@ -1,16 +1,32 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { normalizeEmail, type SessionId, type UserId } from "../domain/identity.js";
 import type {
   CreateEmailAddressInput,
   CreatePasskeyCredentialInput,
+  CreateRecoveryCodeInput,
+  CreateRecoveryRequestInput,
   CreateSessionInput,
   CreateUserInput,
   IdentityStore,
   UpdatePasskeyUsageInput
 } from "../domain/storage.js";
 import type { Database } from "./client.js";
-import { mapEmailAddress, mapPasskeyCredential, mapSession, mapUser } from "./mappers.js";
-import { emailAddresses, passkeyCredentials, sessions, users } from "./schema.js";
+import {
+  mapEmailAddress,
+  mapPasskeyCredential,
+  mapRecoveryCode,
+  mapRecoveryRequest,
+  mapSession,
+  mapUser
+} from "./mappers.js";
+import {
+  emailAddresses,
+  passkeyCredentials,
+  recoveryCodes,
+  recoveryRequests,
+  sessions,
+  users
+} from "./schema.js";
 
 export class PostgresIdentityStore
   implements
@@ -31,6 +47,12 @@ export class PostgresIdentityStore
       | "listSessionsForUser"
       | "revokeSession"
       | "revokeUserSessions"
+      | "createRecoveryCode"
+      | "findUnusedRecoveryCode"
+      | "markRecoveryCodeUsed"
+      | "createRecoveryRequest"
+      | "findActiveRecoveryRequest"
+      | "completeRecoveryRequest"
     >
 {
   constructor(private readonly db: Database) {}
@@ -178,5 +200,79 @@ export class PostgresIdentityStore
 
   async revokeUserSessions(userId: UserId, revokedAt: Date) {
     await this.db.update(sessions).set({ revokedAt }).where(eq(sessions.userId, userId));
+  }
+
+  async createRecoveryCode(input: CreateRecoveryCodeInput) {
+    const [code] = await this.db
+      .insert(recoveryCodes)
+      .values({
+        userId: input.userId,
+        codeHash: input.codeHash
+      })
+      .returning();
+
+    return mapRecoveryCode(code);
+  }
+
+  async findUnusedRecoveryCode(userId: UserId, codeHash: string) {
+    const [code] = await this.db
+      .select()
+      .from(recoveryCodes)
+      .where(
+        and(
+          eq(recoveryCodes.userId, userId),
+          eq(recoveryCodes.codeHash, codeHash),
+          isNull(recoveryCodes.usedAt)
+        )
+      )
+      .limit(1);
+
+    return code ? mapRecoveryCode(code) : null;
+  }
+
+  async markRecoveryCodeUsed(userId: UserId, codeHash: string, usedAt: Date) {
+    await this.db
+      .update(recoveryCodes)
+      .set({ usedAt })
+      .where(and(eq(recoveryCodes.userId, userId), eq(recoveryCodes.codeHash, codeHash)));
+  }
+
+  async createRecoveryRequest(input: CreateRecoveryRequestInput) {
+    const [request] = await this.db
+      .insert(recoveryRequests)
+      .values({
+        userId: input.userId,
+        riskLevel: input.riskLevel,
+        expiresAt: input.expiresAt
+      })
+      .returning();
+
+    return mapRecoveryRequest(request);
+  }
+
+  async findActiveRecoveryRequest(userId: UserId, now: Date) {
+    const [request] = await this.db
+      .select()
+      .from(recoveryRequests)
+      .where(
+        and(
+          eq(recoveryRequests.userId, userId),
+          eq(recoveryRequests.status, "pending"),
+          gt(recoveryRequests.expiresAt, now)
+        )
+      )
+      .limit(1);
+
+    return request ? mapRecoveryRequest(request) : null;
+  }
+
+  async completeRecoveryRequest(userId: UserId, completedAt: Date) {
+    await this.db
+      .update(recoveryRequests)
+      .set({
+        status: "completed",
+        completedAt
+      })
+      .where(and(eq(recoveryRequests.userId, userId), eq(recoveryRequests.status, "pending")));
   }
 }
