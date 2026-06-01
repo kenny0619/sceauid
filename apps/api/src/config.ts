@@ -6,7 +6,9 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().default("postgres://sceauid:sceauid@localhost:55432/sceauid"),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
   SESSION_COOKIE_NAME: z.string().min(1).default("sceauid_session"),
-  APP_ORIGIN: z.string().url().default("http://localhost:3000")
+  APP_ORIGIN: z.string().url().default("http://localhost:3000"),
+  WEBAUTHN_RP_NAME: z.string().min(1).default("SceauID"),
+  WEBAUTHN_RP_ID: z.string().min(1).default("localhost")
 });
 
 export type AppConfig = z.infer<typeof envSchema>;
