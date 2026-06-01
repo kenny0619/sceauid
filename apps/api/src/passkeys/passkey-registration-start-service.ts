@@ -26,6 +26,10 @@ export type StartPasskeyRegistrationResult = {
   expiresAt: Date;
 };
 
+export type PasskeyRegistrationStartService = {
+  start(input: StartPasskeyRegistrationInput): Promise<StartPasskeyRegistrationResult>;
+};
+
 export type GenerateRegistrationOptions = typeof generateRegistrationOptions;
 
 export type PasskeyRegistrationStartServiceOptions = {
@@ -73,7 +77,7 @@ function excludeActiveCredentials(credentials: PasskeyCredential[]) {
   }));
 }
 
-export class DefaultPasskeyRegistrationStartService {
+export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrationStartService {
   private readonly now: () => Date;
   private readonly ttlSeconds: number;
   private readonly createRegistrationId: () => string;
