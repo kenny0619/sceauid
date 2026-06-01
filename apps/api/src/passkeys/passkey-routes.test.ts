@@ -1,16 +1,23 @@
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type { PasskeyCredentialId, UserId } from "../domain/identity.js";
+import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { PasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkey-routes.js";
 
 function createApp(services: {
   finish?: PasskeyRegistrationFinishService;
+  loginStart?: PasskeyLoginStartService;
   start?: PasskeyRegistrationStartService;
 }) {
   const app = Fastify();
   void registerPasskeyRoutes(app, {
+    loginStartService: services.loginStart ?? {
+      async start() {
+        throw new Error("Login start service was not configured");
+      }
+    },
     registrationFinishService: services.finish ?? {
       async finish() {
         throw new Error("Finish service was not configured");
@@ -26,6 +33,98 @@ function createApp(services: {
 }
 
 describe("passkey routes", () => {
+  it("starts passkey login", async () => {
+    const app = createApp({
+      loginStart: {
+        async start(input) {
+          expect(input).toEqual({ userId: "user-id" });
+
+          return {
+            loginId: "login-id",
+            expiresAt: new Date("2026-06-01T12:05:00.000Z"),
+            options: {
+              challenge: "public-challenge",
+              rpId: "localhost",
+              allowCredentials: [
+                {
+                  id: "credential-id",
+                  type: "public-key"
+                }
+              ],
+              timeout: 300_000,
+              userVerification: "preferred"
+            }
+          };
+        }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/passkeys/login/start",
+      payload: {
+        userId: "user-id"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      loginId: "login-id",
+      expiresAt: "2026-06-01T12:05:00.000Z",
+      options: {
+        challenge: "public-challenge",
+        rpId: "localhost",
+        allowCredentials: [
+          {
+            id: "credential-id",
+            type: "public-key"
+          }
+        ],
+        timeout: 300_000,
+        userVerification: "preferred"
+      }
+    });
+  });
+
+  it("maps login start domain errors to HTTP statuses", async () => {
+    const createLoginErrorApp = (message: string) =>
+      createApp({
+        loginStart: {
+          async start() {
+            throw new Error(message);
+          }
+        }
+      });
+
+    const missingUser = await createLoginErrorApp("User was not found").inject({
+      method: "POST",
+      url: "/v1/passkeys/login/start",
+      payload: {
+        userId: "user-id"
+      }
+    });
+    const inactiveUser = await createLoginErrorApp(
+      "User cannot start passkey login unless active"
+    ).inject({
+      method: "POST",
+      url: "/v1/passkeys/login/start",
+      payload: {
+        userId: "user-id"
+      }
+    });
+    const passkeylessUser = await createLoginErrorApp("User has no active passkeys").inject({
+      method: "POST",
+      url: "/v1/passkeys/login/start",
+      payload: {
+        userId: "user-id"
+      }
+    });
+
+    expect(missingUser.statusCode).toBe(404);
+    expect(inactiveUser.statusCode).toBe(409);
+    expect(passkeylessUser.statusCode).toBe(409);
+  });
+
   it("starts passkey registration", async () => {
     const app = createApp({
       start: {

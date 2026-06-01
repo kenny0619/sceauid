@@ -1,13 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { UserId } from "../domain/identity.js";
+import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { PasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
 
 export type PasskeyRoutesDependencies = {
+  loginStartService: PasskeyLoginStartService;
   registrationFinishService: PasskeyRegistrationFinishService;
   registrationStartService: PasskeyRegistrationStartService;
 };
+
+const startLoginBodySchema = z
+  .object({
+    userId: z.string().min(1).optional()
+  })
+  .optional();
 
 const startRegistrationBodySchema = z.object({
   userId: z.string().min(1),
@@ -53,6 +61,25 @@ function resolveRegistrationStartStatus(error: unknown): number {
   return 500;
 }
 
+function resolveLoginStartStatus(error: unknown): number {
+  if (!(error instanceof Error)) {
+    return 500;
+  }
+
+  if (error.message === "User was not found") {
+    return 404;
+  }
+
+  if (
+    error.message === "User cannot start passkey login unless active" ||
+    error.message === "User has no active passkeys"
+  ) {
+    return 409;
+  }
+
+  return 500;
+}
+
 function resolveRegistrationFinishStatus(error: unknown): number {
   if (!(error instanceof Error)) {
     return 500;
@@ -87,6 +114,40 @@ export async function registerPasskeyRoutes(
   app: FastifyInstance,
   dependencies: PasskeyRoutesDependencies
 ): Promise<void> {
+  app.post("/v1/passkeys/login/start", async (request, reply) => {
+    const body = startLoginBodySchema.safeParse(request.body);
+
+    if (!body.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Request body did not match the passkey login start schema"
+      });
+    }
+
+    try {
+      const result = await dependencies.loginStartService.start({
+        userId: body.data?.userId as UserId | undefined
+      });
+
+      return reply.send({
+        loginId: result.loginId,
+        expiresAt: result.expiresAt.toISOString(),
+        options: result.options
+      });
+    } catch (error) {
+      const status = resolveLoginStartStatus(error);
+
+      if (status === 500) {
+        throw error;
+      }
+
+      return reply.status(status).send({
+        error: "login_start_failed",
+        message: error instanceof Error ? error.message : "Unable to start passkey login"
+      });
+    }
+  });
+
   app.post("/v1/passkeys/registration/start", async (request, reply) => {
     const body = startRegistrationBodySchema.safeParse(request.body);
 
