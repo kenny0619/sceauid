@@ -38,13 +38,19 @@ async function migrate() {
   });
 
   try {
-    await client`
-      create table if not exists drizzle_migrations (
-        id serial primary key,
-        name text not null unique,
-        applied_at timestamp with time zone not null default now()
-      )
+    const [migrationTable] = await client<{ exists: boolean }[]>`
+      select to_regclass('public.drizzle_migrations') is not null as exists
     `;
+
+    if (!migrationTable.exists) {
+      await client`
+        create table drizzle_migrations (
+          id serial primary key,
+          name text not null unique,
+          applied_at timestamp with time zone not null default now()
+        )
+      `;
+    }
 
     const appliedRows = await client<{ name: string }[]>`
       select name from drizzle_migrations
