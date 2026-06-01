@@ -5,6 +5,7 @@ import { createRedisChallengeStore } from "./challenges/redis-challenge-store.js
 import { loadConfig } from "./config.js";
 import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
+import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-registration-finish-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
 
@@ -17,6 +18,14 @@ const registrationStartService = new DefaultPasskeyRegistrationStartService(
   challengeStore.store,
   {
     rpName: config.WEBAUTHN_RP_NAME,
+    rpId: config.WEBAUTHN_RP_ID,
+    origin: config.APP_ORIGIN
+  }
+);
+const registrationFinishService = new DefaultPasskeyRegistrationFinishService(
+  identityStore,
+  challengeStore.store,
+  {
     rpId: config.WEBAUTHN_RP_ID,
     origin: config.APP_ORIGIN
   }
@@ -39,7 +48,10 @@ await app.register(cors, {
 });
 
 await app.register(cookie);
-await registerPasskeyRoutes(app, { registrationStartService });
+await registerPasskeyRoutes(app, {
+  registrationFinishService,
+  registrationStartService
+});
 
 app.get("/health", async () => ({
   status: "ok",
