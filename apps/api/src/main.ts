@@ -5,6 +5,7 @@ import { createRedisChallengeStore } from "./challenges/redis-challenge-store.js
 import { loadConfig } from "./config.js";
 import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
+import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-service.js";
 import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-registration-finish-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
@@ -13,6 +14,10 @@ const config = loadConfig();
 const databaseClient = createDatabaseClient(config);
 const identityStore = new PostgresIdentityStore(databaseClient.db);
 const challengeStore = await createRedisChallengeStore(config.REDIS_URL);
+const loginStartService = new DefaultPasskeyLoginStartService(identityStore, challengeStore.store, {
+  rpId: config.WEBAUTHN_RP_ID,
+  origin: config.APP_ORIGIN
+});
 const registrationStartService = new DefaultPasskeyRegistrationStartService(
   identityStore,
   challengeStore.store,
@@ -49,6 +54,7 @@ await app.register(cors, {
 
 await app.register(cookie);
 await registerPasskeyRoutes(app, {
+  loginStartService,
   registrationFinishService,
   registrationStartService
 });
