@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ChallengeRecord } from "../domain/storage.js";
-import { createRedisChallengeStore, type RedisChallengeStore } from "./redis-challenge-store.js";
+import { type RedisChallengeStore, createRedisChallengeStore } from "./redis-challenge-store.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 const now = new Date("2026-06-01T12:00:00.000Z");
