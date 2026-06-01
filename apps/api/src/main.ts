@@ -1,12 +1,12 @@
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { createRedisChallengeStore } from "./challenges/redis-challenge-store.js";
 import { loadConfig } from "./config.js";
 import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
-import { createRedisChallengeStore } from "./challenges/redis-challenge-store.js";
-import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
+import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
 
 const config = loadConfig();
 const databaseClient = createDatabaseClient(config);

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
-  generateRegistrationOptions,
   type PublicKeyCredentialCreationOptionsJSON,
-  type Uint8Array_
+  type Uint8Array_,
+  generateRegistrationOptions
 } from "@simplewebauthn/server";
 import type { PasskeyCredential, User, UserId } from "../domain/identity.js";
 import { isPasskeyActive } from "../domain/identity.js";
