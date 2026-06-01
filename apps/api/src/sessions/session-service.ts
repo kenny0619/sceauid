@@ -1,7 +1,7 @@
 import type { RequestContext, Session, SessionId, UserId } from "../domain/identity.js";
 import { isSessionActive } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
-import { generateSessionToken, hashSessionToken, type SessionToken } from "./session-token.js";
+import { type SessionToken, generateSessionToken, hashSessionToken } from "./session-token.js";
 
 export type CreateSessionServiceInput = {
   userId: UserId;
