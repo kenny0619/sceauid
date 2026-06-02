@@ -1,12 +1,12 @@
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type { PasskeyCredentialId, SessionId, UserId } from "../domain/identity.js";
+import type { SessionToken } from "../sessions/session-token.js";
 import type { PasskeyLoginFinishService } from "./passkey-login-finish-service.js";
 import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { PasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkey-routes.js";
-import type { SessionToken } from "../sessions/session-token.js";
 
 function createApp(services: {
   finish?: PasskeyRegistrationFinishService;
