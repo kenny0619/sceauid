@@ -27,6 +27,8 @@ export type SecurityEventService = {
 
 export type ListSecurityEventsInput = {
   eventTypes?: SecurityEventType[];
+  outcomes?: SecurityEventOutcome[];
+  riskLevels?: RiskLevel[];
   limit?: number;
 };
 
@@ -87,6 +89,8 @@ export class DefaultSecurityEventService implements SecurityEventService {
     return this.store.listSecurityEventsForUser({
       userId,
       eventTypes: input.eventTypes?.length ? input.eventTypes : undefined,
+      outcomes: input.outcomes?.length ? input.outcomes : undefined,
+      riskLevels: input.riskLevels?.length ? input.riskLevels : undefined,
       limit: normalizeLimit(input.limit)
     });
   }

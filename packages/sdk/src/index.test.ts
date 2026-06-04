@@ -257,6 +257,8 @@ describe("SceauIDClient", () => {
 
     const result = await client.securityEvents({
       eventTypes: ["login_failed", "session_revoked"],
+      outcomes: ["failure"],
+      riskLevels: ["medium", "high"],
       limit: 10
     });
 
@@ -271,7 +273,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/security-events?limit=10&eventType=login_failed&eventType=session_revoked"
+        url: "https://identity.example.com/v1/security-events?limit=10&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high"
       }
     ]);
   });

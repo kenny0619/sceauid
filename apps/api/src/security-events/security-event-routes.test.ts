@@ -2,8 +2,10 @@ import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type {
+  RiskLevel,
   SecurityEvent,
   SecurityEventId,
+  SecurityEventOutcome,
   SecurityEventType,
   Session,
   SessionId,
@@ -86,7 +88,12 @@ describe("security event routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(listCalls).toEqual([{ userId, input: { eventTypes: undefined, limit: 10 } }]);
+    expect(listCalls).toEqual([
+      {
+        userId,
+        input: { eventTypes: undefined, outcomes: undefined, riskLevels: undefined, limit: 10 }
+      }
+    ]);
     expect(response.json()).toEqual({
       events: [
         {
@@ -131,6 +138,36 @@ describe("security event routes", () => {
         userId,
         input: {
           eventTypes: ["login_failed", "session_revoked"] satisfies SecurityEventType[],
+          limit: undefined
+        }
+      }
+    ]);
+  });
+
+  it("filters security events by outcome and risk level", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?outcome=failure,pending&riskLevel=medium&riskLevel=high",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls).toEqual([
+      {
+        userId,
+        input: {
+          eventTypes: undefined,
+          outcomes: ["failure", "pending"] satisfies SecurityEventOutcome[],
+          riskLevels: ["medium", "high"] satisfies RiskLevel[],
           limit: undefined
         }
       }
@@ -206,6 +243,27 @@ describe("security event routes", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/security-events?eventType=unknown_event",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_request",
+      message: "Query parameters did not match the security event list schema"
+    });
+  });
+
+  it("rejects unknown timeline filters", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?outcome=maybe&riskLevel=critical",
       cookies: {
         sceauid_session: "session-token"
       }
