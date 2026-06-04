@@ -231,6 +231,48 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("lists security events with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      events: [
+        {
+          id: "event_123",
+          userId: "user_123",
+          actorUserId: "user_123",
+          sessionId: "session_123",
+          eventType: "session_revoked",
+          outcome: "success",
+          riskLevel: "low",
+          metadata: {
+            reason: "targeted_revoke"
+          },
+          context: {},
+          createdAt: "2026-06-04T12:00:00.000Z"
+        }
+      ]
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.securityEvents({ limit: 10 });
+
+    expect(result.events).toHaveLength(1);
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/security-events?limit=10"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {

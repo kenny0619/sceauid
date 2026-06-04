@@ -172,6 +172,27 @@ export type LogoutResponse = {
   ok: true;
 };
 
+export type ListedSecurityEvent = {
+  id: string;
+  userId: string | null;
+  actorUserId: string | null;
+  sessionId: string | null;
+  eventType: string;
+  outcome: "failure" | "pending" | "success";
+  riskLevel: "high" | "low" | "medium";
+  metadata: Record<string, unknown>;
+  context: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ListSecurityEventsInput = {
+  limit?: number;
+};
+
+export type ListSecurityEventsResponse = {
+  events: ListedSecurityEvent[];
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -231,6 +252,18 @@ export class SceauIDClient {
     return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}`, {
       method: "DELETE"
     });
+  }
+
+  async securityEvents(input: ListSecurityEventsInput = {}): Promise<ListSecurityEventsResponse> {
+    const searchParams = new URLSearchParams();
+
+    if (input.limit !== undefined) {
+      searchParams.set("limit", String(input.limit));
+    }
+
+    const query = searchParams.toString();
+
+    return this.request(`/v1/security-events${query ? `?${query}` : ""}`);
   }
 
   async meta(): Promise<unknown> {
