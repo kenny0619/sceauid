@@ -197,6 +197,15 @@ export class PostgresIdentityStore implements IdentityStore {
     return mapRecoveryCode(code);
   }
 
+  async countUnusedRecoveryCodesForUser(userId: UserId) {
+    const codes = await this.db
+      .select({ id: recoveryCodes.id })
+      .from(recoveryCodes)
+      .where(and(eq(recoveryCodes.userId, userId), isNull(recoveryCodes.usedAt)));
+
+    return codes.length;
+  }
+
   async findUnusedRecoveryCode(userId: UserId, codeHash: string) {
     const [code] = await this.db
       .select()
@@ -211,6 +220,13 @@ export class PostgresIdentityStore implements IdentityStore {
       .limit(1);
 
     return code ? mapRecoveryCode(code) : null;
+  }
+
+  async markUnusedRecoveryCodesUsed(userId: UserId, usedAt: Date) {
+    await this.db
+      .update(recoveryCodes)
+      .set({ usedAt })
+      .where(and(eq(recoveryCodes.userId, userId), isNull(recoveryCodes.usedAt)));
   }
 
   async markRecoveryCodeUsed(userId: UserId, codeHash: string, usedAt: Date) {
