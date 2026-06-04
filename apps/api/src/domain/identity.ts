@@ -14,8 +14,11 @@ export type SecurityEventOutcome = "success" | "failure" | "pending";
 export type SecurityEventType =
   | "signup_started"
   | "email_verified"
+  | "passkey_registration_started"
   | "passkey_registered"
+  | "passkey_registration_failed"
   | "passkey_removed"
+  | "login_started"
   | "login_succeeded"
   | "login_failed"
   | "session_created"

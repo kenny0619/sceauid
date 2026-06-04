@@ -32,8 +32,11 @@ export const securityEventOutcome = pgEnum("security_event_outcome", [
 export const securityEventType = pgEnum("security_event_type", [
   "signup_started",
   "email_verified",
+  "passkey_registration_started",
   "passkey_registered",
+  "passkey_registration_failed",
   "passkey_removed",
+  "login_started",
   "login_succeeded",
   "login_failed",
   "session_created",
