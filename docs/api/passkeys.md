@@ -201,6 +201,22 @@ Response:
 
 Missing, expired, revoked, or invalid sessions return `401` with `error: "unauthenticated"`.
 
+## Logout
+
+`DELETE /v1/sessions/current`
+
+This endpoint revokes the current server-side session when the session cookie is valid and clears the session cookie in the response.
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+Logout is idempotent for browser clients. If the request has no active session cookie, the API still clears the cookie and returns success.
+
 ## Session Cookie Behavior
 
 The default cookie behavior is:

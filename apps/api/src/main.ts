@@ -96,7 +96,11 @@ await registerPasskeyRoutes(app, {
   }
 });
 await registerSessionRoutes(app, {
-  sessionCookieName: config.SESSION_COOKIE_NAME,
+  sessionCookie: {
+    name: config.SESSION_COOKIE_NAME,
+    sameSite: "lax",
+    secure: config.NODE_ENV === "production"
+  },
   sessionService,
   store: identityStore
 });
