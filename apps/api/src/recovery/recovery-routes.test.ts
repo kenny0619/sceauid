@@ -21,6 +21,7 @@ const session: Session = {
 function createApp(
   options: {
     authenticatedSession?: Session | null;
+    rejectCompletion?: "expired" | "not_found" | "not_pending";
     rejectRecoveryRequestLookup?: boolean;
     rejectRedemption?: boolean;
   } = {}
@@ -33,6 +34,28 @@ function createApp(
   void app.register(cookie);
   void registerRecoveryRoutes(app, {
     recoveryCodes: {
+      async completeRecoveryRequest(statusRecoveryRequestId) {
+        if (options.rejectCompletion === "not_found") {
+          throw new Error("Recovery request was not found");
+        }
+
+        if (options.rejectCompletion === "expired") {
+          throw new Error("Recovery request is expired");
+        }
+
+        if (options.rejectCompletion === "not_pending") {
+          throw new Error("Recovery request is not pending");
+        }
+
+        return {
+          ok: true,
+          recoveryRequest: {
+            id: statusRecoveryRequestId,
+            completedAt: new Date("2026-06-01T12:01:00.000Z"),
+            status: "completed"
+          }
+        };
+      },
       async enroll(input) {
         enrollments.push(input);
         return {
@@ -235,6 +258,70 @@ describe("recovery routes", () => {
     expect(response.json()).toEqual({
       error: "recovery_request_not_found",
       message: "Recovery request was not found"
+    });
+  });
+
+  it("completes recovery requests", async () => {
+    const { app } = createApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/recovery/requests/${recoveryRequestId}/complete`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequestId,
+        completedAt: "2026-06-01T12:01:00.000Z",
+        status: "completed"
+      }
+    });
+  });
+
+  it("returns not found when completing unknown recovery requests", async () => {
+    const { app } = createApp({ rejectCompletion: "not_found" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/recovery/requests/${recoveryRequestId}/complete`
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "recovery_request_not_found",
+      message: "Recovery request was not found"
+    });
+  });
+
+  it("rejects expired recovery request completion", async () => {
+    const { app } = createApp({ rejectCompletion: "expired" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/recovery/requests/${recoveryRequestId}/complete`
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "recovery_request_expired",
+      message: "Recovery request is expired"
+    });
+  });
+
+  it("rejects non-pending recovery request completion", async () => {
+    const { app } = createApp({ rejectCompletion: "not_pending" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/recovery/requests/${recoveryRequestId}/complete`
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "recovery_request_not_pending",
+      message: "Recovery request is not pending"
     });
   });
 

@@ -136,4 +136,46 @@ export async function registerRecoveryRoutes(
       throw error;
     }
   });
+
+  app.post("/v1/recovery/requests/:recoveryRequestId/complete", async (request, reply) => {
+    const params = recoveryRequestParamsSchema.safeParse(request.params);
+
+    if (!params.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Recovery request completion is invalid"
+      });
+    }
+
+    try {
+      return reply.send(
+        await dependencies.recoveryCodes.completeRecoveryRequest(
+          params.data.recoveryRequestId as RecoveryRequestId
+        )
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "Recovery request was not found") {
+        return reply.status(404).send({
+          error: "recovery_request_not_found",
+          message: "Recovery request was not found"
+        });
+      }
+
+      if (error instanceof Error && error.message === "Recovery request is expired") {
+        return reply.status(409).send({
+          error: "recovery_request_expired",
+          message: "Recovery request is expired"
+        });
+      }
+
+      if (error instanceof Error && error.message === "Recovery request is not pending") {
+        return reply.status(409).send({
+          error: "recovery_request_not_pending",
+          message: "Recovery request is not pending"
+        });
+      }
+
+      throw error;
+    }
+  });
 }

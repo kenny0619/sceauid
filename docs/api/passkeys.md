@@ -326,6 +326,25 @@ Response:
 
 Pending requests are reported as `expired` and `active: false` after their expiry time. Unknown request IDs return `404` with `error: "recovery_request_not_found"`.
 
+### Complete Recovery Request
+
+`POST /v1/recovery/requests/:recoveryRequestId/complete`
+
+Response:
+
+```json
+{
+  "ok": true,
+  "recoveryRequest": {
+    "id": "recovery_request_123",
+    "completedAt": "2026-06-01T12:01:00.000Z",
+    "status": "completed"
+  }
+}
+```
+
+Only pending and unexpired recovery requests can be completed. Unknown requests return `404` with `error: "recovery_request_not_found"`. Expired requests return `409` with `error: "recovery_request_expired"`. Requests that are already completed, verified, cancelled, or otherwise no longer pending return `409` with `error: "recovery_request_not_pending"`.
+
 ## Session List
 
 `GET /v1/sessions`
@@ -416,6 +435,9 @@ Current passkey route error codes:
 - `login_finish_failed`
 - `unauthenticated`
 - `invalid_recovery_code`
+- `recovery_request_expired`
+- `recovery_request_not_found`
+- `recovery_request_not_pending`
 - `security_event_not_found`
 
 ## Security Events

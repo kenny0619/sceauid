@@ -292,6 +292,25 @@ export class PostgresIdentityStore implements IdentityStore {
     return request ? mapRecoveryRequest(request) : null;
   }
 
+  async completeActiveRecoveryRequest(recoveryRequestId: RecoveryRequestId, completedAt: Date) {
+    const [request] = await this.db
+      .update(recoveryRequests)
+      .set({
+        status: "completed",
+        completedAt
+      })
+      .where(
+        and(
+          eq(recoveryRequests.id, recoveryRequestId),
+          eq(recoveryRequests.status, "pending"),
+          gt(recoveryRequests.expiresAt, completedAt)
+        )
+      )
+      .returning();
+
+    return request ? mapRecoveryRequest(request) : null;
+  }
+
   async completeRecoveryRequest(userId: UserId, completedAt: Date) {
     await this.db
       .update(recoveryRequests)
