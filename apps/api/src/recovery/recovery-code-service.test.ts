@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RecoveryRequestId, SessionId, UserId } from "../domain/identity.js";
+import type { RecoveryRequest, RecoveryRequestId, SessionId, UserId } from "../domain/identity.js";
 import type {
   CreateRecoveryCodeInput,
   CreateRecoveryRequestInput,
@@ -23,6 +23,15 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   const markedUsed: Array<{ userId: UserId; usedAt: Date }> = [];
   const recordedEvents: Array<Parameters<SecurityEventService["record"]>[0]> = [];
   let consumeRecoveryCodeResult = true;
+  let recoveryRequest: RecoveryRequest | null = {
+    id: recoveryRequestId,
+    userId,
+    status: "pending",
+    riskLevel: "medium",
+    expiresAt: new Date("2026-06-01T12:05:00.000Z"),
+    completedAt: null,
+    createdAt: new Date("2026-06-01T12:00:00.000Z")
+  };
 
   const store: Pick<
     IdentityStore,
@@ -30,6 +39,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     | "countUnusedRecoveryCodesForUser"
     | "createRecoveryRequest"
     | "createRecoveryCode"
+    | "findRecoveryRequestById"
     | "markUnusedRecoveryCodesUsed"
   > = {
     async consumeRecoveryCode(consumeUserId, codeHash, usedAt) {
@@ -55,6 +65,10 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
         completedAt: null,
         createdAt: new Date("2026-06-01T12:00:00.000Z")
       };
+    },
+    async findRecoveryRequestById(requestId) {
+      expect(requestId).toBe(recoveryRequestId);
+      return recoveryRequest;
     },
     async markUnusedRecoveryCodesUsed(markUserId, usedAt) {
       markedUsed.push({ userId: markUserId, usedAt });
@@ -82,6 +96,9 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     createdRecoveryRequests,
     markRecoveryCodeInvalid() {
       consumeRecoveryCodeResult = false;
+    },
+    markRecoveryRequestMissing() {
+      recoveryRequest = null;
     },
     markedUsed,
     recordedEvents,
@@ -209,5 +226,46 @@ describe("DefaultRecoveryCodeService", () => {
       "Recovery code was invalid or already used"
     );
     expect(recordedEvents).toEqual([]);
+  });
+
+  it("returns recovery request status", async () => {
+    const { store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, {
+      now: () => new Date("2026-06-01T12:00:00.000Z")
+    });
+
+    await expect(service.recoveryRequestStatus(recoveryRequestId)).resolves.toEqual({
+      recoveryRequest: {
+        id: recoveryRequestId,
+        active: true,
+        expiresAt: new Date("2026-06-01T12:05:00.000Z"),
+        riskLevel: "medium",
+        status: "pending"
+      }
+    });
+  });
+
+  it("reports expired pending recovery requests as inactive", async () => {
+    const { store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, {
+      now: () => new Date("2026-06-01T12:06:00.000Z")
+    });
+
+    await expect(service.recoveryRequestStatus(recoveryRequestId)).resolves.toMatchObject({
+      recoveryRequest: {
+        active: false,
+        status: "expired"
+      }
+    });
+  });
+
+  it("rejects unknown recovery request status lookups", async () => {
+    const { markRecoveryRequestMissing, store } = createFakeStore();
+    markRecoveryRequestMissing();
+    const service = new DefaultRecoveryCodeService(store);
+
+    await expect(service.recoveryRequestStatus(recoveryRequestId)).rejects.toThrow(
+      "Recovery request was not found"
+    );
   });
 });

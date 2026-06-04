@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { UserId } from "../domain/identity.js";
+import type { RecoveryRequestId, UserId } from "../domain/identity.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { RecoveryCodeService } from "./recovery-code-service.js";
 
@@ -13,6 +13,10 @@ export type RecoveryRoutesDependencies = {
 const redeemRecoveryCodeBodySchema = z.object({
   code: z.string().min(1),
   userId: z.string().min(1)
+});
+
+const recoveryRequestParamsSchema = z.object({
+  recoveryRequestId: z.string().min(1)
 });
 
 async function authenticateRequest(
@@ -98,6 +102,34 @@ export async function registerRecoveryRoutes(
         return reply.status(401).send({
           error: "invalid_recovery_code",
           message: "Recovery code is invalid or already used"
+        });
+      }
+
+      throw error;
+    }
+  });
+
+  app.get("/v1/recovery/requests/:recoveryRequestId", async (request, reply) => {
+    const params = recoveryRequestParamsSchema.safeParse(request.params);
+
+    if (!params.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Recovery request lookup is invalid"
+      });
+    }
+
+    try {
+      return reply.send(
+        await dependencies.recoveryCodes.recoveryRequestStatus(
+          params.data.recoveryRequestId as RecoveryRequestId
+        )
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "Recovery request was not found") {
+        return reply.status(404).send({
+          error: "recovery_request_not_found",
+          message: "Recovery request was not found"
         });
       }
 

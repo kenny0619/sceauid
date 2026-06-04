@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
 import {
+  type RecoveryRequestId,
   type SecurityEventId,
   type SessionId,
   type UserId,
@@ -276,6 +277,16 @@ export class PostgresIdentityStore implements IdentityStore {
           gt(recoveryRequests.expiresAt, now)
         )
       )
+      .limit(1);
+
+    return request ? mapRecoveryRequest(request) : null;
+  }
+
+  async findRecoveryRequestById(recoveryRequestId: RecoveryRequestId) {
+    const [request] = await this.db
+      .select()
+      .from(recoveryRequests)
+      .where(eq(recoveryRequests.id, recoveryRequestId))
       .limit(1);
 
     return request ? mapRecoveryRequest(request) : null;

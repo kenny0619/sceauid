@@ -486,6 +486,39 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("fetches recovery request status", async () => {
+    const { calls, fetch } = createFetchStub({
+      recoveryRequest: {
+        id: "recovery/request/123",
+        active: true,
+        expiresAt: "2026-06-01T12:15:00.000Z",
+        riskLevel: "medium",
+        status: "pending"
+      }
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.recoveryRequestStatus("recovery/request/123");
+
+    expect(result.recoveryRequest.active).toBe(true);
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/recovery/requests/recovery%2Frequest%2F123"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {

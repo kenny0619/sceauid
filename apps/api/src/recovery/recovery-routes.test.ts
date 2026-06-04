@@ -19,7 +19,11 @@ const session: Session = {
 };
 
 function createApp(
-  options: { authenticatedSession?: Session | null; rejectRedemption?: boolean } = {}
+  options: {
+    authenticatedSession?: Session | null;
+    rejectRecoveryRequestLookup?: boolean;
+    rejectRedemption?: boolean;
+  } = {}
 ) {
   const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
   const redeemedCodes: Array<{ code: string; userId: UserId }> = [];
@@ -50,6 +54,21 @@ function createApp(
             id: recoveryRequestId,
             expiresAt: new Date("2026-06-01T12:15:00.000Z"),
             riskLevel: "medium"
+          }
+        };
+      },
+      async recoveryRequestStatus(statusRecoveryRequestId) {
+        if (options.rejectRecoveryRequestLookup) {
+          throw new Error("Recovery request was not found");
+        }
+
+        return {
+          recoveryRequest: {
+            id: statusRecoveryRequestId,
+            active: true,
+            expiresAt: new Date("2026-06-01T12:15:00.000Z"),
+            riskLevel: "medium",
+            status: "pending"
           }
         };
       },
@@ -181,6 +200,41 @@ describe("recovery routes", () => {
     expect(response.json()).toEqual({
       error: "invalid_recovery_code",
       message: "Recovery code is invalid or already used"
+    });
+  });
+
+  it("returns recovery request status", async () => {
+    const { app } = createApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/recovery/requests/${recoveryRequestId}`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      recoveryRequest: {
+        id: recoveryRequestId,
+        active: true,
+        expiresAt: "2026-06-01T12:15:00.000Z",
+        riskLevel: "medium",
+        status: "pending"
+      }
+    });
+  });
+
+  it("returns not found for unknown recovery requests", async () => {
+    const { app } = createApp({ rejectRecoveryRequestLookup: true });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/recovery/requests/${recoveryRequestId}`
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "recovery_request_not_found",
+      message: "Recovery request was not found"
     });
   });
 

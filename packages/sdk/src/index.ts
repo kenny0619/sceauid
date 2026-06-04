@@ -239,6 +239,16 @@ export type RedeemRecoveryCodeResponse = {
   };
 };
 
+export type RecoveryRequestStatusResponse = {
+  recoveryRequest: {
+    id: string;
+    active: boolean;
+    expiresAt: string;
+    riskLevel: "high" | "low" | "medium";
+    status: "cancelled" | "completed" | "expired" | "pending" | "verified";
+  };
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -357,6 +367,10 @@ export class SceauIDClient {
       body: input,
       method: "POST"
     });
+  }
+
+  async recoveryRequestStatus(recoveryRequestId: string): Promise<RecoveryRequestStatusResponse> {
+    return this.request(`/v1/recovery/requests/${encodeURIComponent(recoveryRequestId)}`);
   }
 
   async meta(): Promise<unknown> {
