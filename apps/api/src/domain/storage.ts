@@ -5,6 +5,7 @@ import type {
   RecoveryRequest,
   RiskLevel,
   SecurityEvent,
+  SecurityEventId,
   SecurityEventOutcome,
   SecurityEventType,
   Session,
@@ -88,7 +89,7 @@ export type IdentityStore = {
   completeRecoveryRequest(userId: UserId, completedAt: Date): Promise<void>;
 
   createSecurityEvent(input: CreateSecurityEventInput): Promise<SecurityEvent>;
-  listSecurityEventsForUser(filter: SecurityEventFilter): Promise<SecurityEvent[]>;
+  listSecurityEventsForUser(filter: SecurityEventFilter): Promise<SecurityEventPage>;
 };
 
 export type ChallengePurpose = "passkey_registration" | "passkey_login" | "email_recovery";
@@ -122,5 +123,16 @@ export type SecurityEventFilter = {
   eventTypes?: SecurityEventType[];
   outcomes?: SecurityEventOutcome[];
   riskLevels?: RiskLevel[];
+  cursor?: SecurityEventCursor;
   limit: number;
+};
+
+export type SecurityEventCursor = {
+  createdAt: Date;
+  id: SecurityEventId;
+};
+
+export type SecurityEventPage = {
+  events: SecurityEvent[];
+  nextCursor?: SecurityEventCursor;
 };

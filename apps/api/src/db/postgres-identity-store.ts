@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
 import { type SessionId, type UserId, normalizeEmail } from "../domain/identity.js";
 import type {
   CreateEmailAddressInput,
@@ -283,6 +283,17 @@ export class PostgresIdentityStore implements IdentityStore {
         : []),
       ...(filter.riskLevels && filter.riskLevels.length > 0
         ? [inArray(securityEvents.riskLevel, filter.riskLevels)]
+        : []),
+      ...(filter.cursor
+        ? [
+            or(
+              lt(securityEvents.createdAt, filter.cursor.createdAt),
+              and(
+                eq(securityEvents.createdAt, filter.cursor.createdAt),
+                lt(securityEvents.id, filter.cursor.id)
+              )
+            )
+          ]
         : [])
     ];
 
@@ -290,9 +301,17 @@ export class PostgresIdentityStore implements IdentityStore {
       .select()
       .from(securityEvents)
       .where(and(...conditions))
-      .orderBy(desc(securityEvents.createdAt))
-      .limit(filter.limit);
+      .orderBy(desc(securityEvents.createdAt), desc(securityEvents.id))
+      .limit(filter.limit + 1);
 
-    return events.map(mapSecurityEvent);
+    const pageEvents = events.slice(0, filter.limit).map(mapSecurityEvent);
+    const lastEvent = pageEvents.at(-1);
+
+    return {
+      events: pageEvents,
+      ...(events.length > filter.limit && lastEvent
+        ? { nextCursor: { createdAt: lastEvent.createdAt, id: lastEvent.id } }
+        : {})
+    };
   }
 }

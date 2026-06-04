@@ -7,7 +7,10 @@ import type {
   SecurityEventType
 } from "../domain/identity.js";
 import type { SessionService } from "../sessions/session-service.js";
-import type { SecurityEventService } from "./security-event-service.js";
+import {
+  InvalidSecurityEventCursorError,
+  type SecurityEventService
+} from "./security-event-service.js";
 
 export type SecurityEventRoutesDependencies = {
   securityEvents: Pick<SecurityEventService, "listForUser">;
@@ -67,6 +70,7 @@ const outcomeQuerySchema = multiValueQuerySchema(securityEventOutcomes);
 const riskLevelQuerySchema = multiValueQuerySchema(riskLevels);
 
 const listSecurityEventsQuerySchema = z.object({
+  cursor: z.string().min(1).optional(),
   eventType: eventTypeQuerySchema,
   outcome: outcomeQuerySchema,
   riskLevel: riskLevelQuerySchema,
@@ -120,15 +124,28 @@ export async function registerSecurityEventRoutes(
       });
     }
 
-    const events = await dependencies.securityEvents.listForUser(session.userId, {
-      eventTypes: query.data.eventType,
-      outcomes: query.data.outcome,
-      riskLevels: query.data.riskLevel,
-      limit: query.data.limit
-    });
+    try {
+      const page = await dependencies.securityEvents.listForUser(session.userId, {
+        cursor: query.data.cursor,
+        eventTypes: query.data.eventType,
+        outcomes: query.data.outcome,
+        riskLevels: query.data.riskLevel,
+        limit: query.data.limit
+      });
 
-    return reply.send({
-      events: events.map(serializeSecurityEvent)
-    });
+      return reply.send({
+        events: page.events.map(serializeSecurityEvent),
+        nextCursor: page.nextCursor ?? null
+      });
+    } catch (error) {
+      if (error instanceof InvalidSecurityEventCursorError) {
+        return reply.status(400).send({
+          error: "invalid_request",
+          message: "Security event cursor is invalid"
+        });
+      }
+
+      throw error;
+    }
   });
 }

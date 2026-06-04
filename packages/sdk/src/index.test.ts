@@ -248,7 +248,8 @@ describe("SceauIDClient", () => {
           context: {},
           createdAt: "2026-06-04T12:00:00.000Z"
         }
-      ]
+      ],
+      nextCursor: "next-page-token"
     });
     const client = new SceauIDClient({
       baseUrl: "https://identity.example.com",
@@ -256,6 +257,7 @@ describe("SceauIDClient", () => {
     });
 
     const result = await client.securityEvents({
+      cursor: "current-page-token",
       eventTypes: ["login_failed", "session_revoked"],
       outcomes: ["failure"],
       riskLevels: ["medium", "high"],
@@ -263,6 +265,7 @@ describe("SceauIDClient", () => {
     });
 
     expect(result.events).toHaveLength(1);
+    expect(result.nextCursor).toBe("next-page-token");
     expect(calls).toEqual([
       {
         init: {
@@ -273,7 +276,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/security-events?limit=10&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high"
+        url: "https://identity.example.com/v1/security-events?limit=10&cursor=current-page-token&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high"
       }
     ]);
   });

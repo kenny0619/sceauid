@@ -74,18 +74,20 @@ describe("DefaultPasskeyLoginStartService integration", () => {
     });
     await expect(
       context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
-    ).resolves.toMatchObject([
-      {
-        userId: user.id,
-        eventType: "login_started",
-        outcome: "pending",
-        metadata: {
-          loginId: "login-id",
-          mode: "scoped",
-          allowedCredentials: 1
+    ).resolves.toMatchObject({
+      events: [
+        {
+          userId: user.id,
+          eventType: "login_started",
+          outcome: "pending",
+          metadata: {
+            loginId: "login-id",
+            mode: "scoped",
+            allowedCredentials: 1
+          }
         }
-      }
-    ]);
+      ]
+    });
   });
 
   it("generates discoverable login options without credential allow-listing", async () => {

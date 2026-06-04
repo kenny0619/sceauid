@@ -93,16 +93,18 @@ describe("DefaultPasskeyRegistrationStartService integration", () => {
     });
     await expect(
       context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
-    ).resolves.toMatchObject([
-      {
-        userId: user.id,
-        eventType: "passkey_registration_started",
-        outcome: "pending",
-        metadata: {
-          registrationId: "registration-id",
-          existingActivePasskeys: 1
+    ).resolves.toMatchObject({
+      events: [
+        {
+          userId: user.id,
+          eventType: "passkey_registration_started",
+          outcome: "pending",
+          metadata: {
+            registrationId: "registration-id",
+            existingActivePasskeys: 1
+          }
         }
-      }
-    ]);
+      ]
+    });
   });
 });

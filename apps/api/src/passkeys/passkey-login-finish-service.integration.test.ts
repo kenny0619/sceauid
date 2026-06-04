@@ -123,21 +123,23 @@ describe("DefaultPasskeyLoginFinishService integration", () => {
     });
     await expect(
       context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
-    ).resolves.toMatchObject([
-      {
-        userId: user.id,
-        sessionId: result.session.session.id,
-        eventType: "login_succeeded",
-        outcome: "success",
-        metadata: {
-          credentialId: "credential-id",
-          loginId: "login-id"
-        },
-        context: {
-          ipHash: "ip-hash",
-          userAgent: "test-agent"
+    ).resolves.toMatchObject({
+      events: [
+        {
+          userId: user.id,
+          sessionId: result.session.session.id,
+          eventType: "login_succeeded",
+          outcome: "success",
+          metadata: {
+            credentialId: "credential-id",
+            loginId: "login-id"
+          },
+          context: {
+            ipHash: "ip-hash",
+            userAgent: "test-agent"
+          }
         }
-      }
-    ]);
+      ]
+    });
   });
 });

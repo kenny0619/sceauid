@@ -355,7 +355,7 @@ Session revocation events include metadata for `reason`, `actorSessionId`, and w
 
 ### List Security Events
 
-`GET /v1/security-events?limit=50&eventType=login_failed&outcome=failure&riskLevel=medium`
+`GET /v1/security-events?limit=50&eventType=login_failed&outcome=failure&riskLevel=medium&cursor=next_page_token`
 
 Authenticated clients can fetch the current user's security timeline.
 
@@ -378,11 +378,14 @@ Response:
       "context": {},
       "createdAt": "2026-06-04T12:00:00.000Z"
     }
-  ]
+  ],
+  "nextCursor": "next_page_token"
 }
 ```
 
 `limit` is optional and must be between `1` and `100`.
+
+`cursor` is optional. Use the previous response's `nextCursor` to fetch the next page. `nextCursor` is `null` when there are no more events.
 
 `eventType` is optional and can be provided more than once or as a comma-separated list.
 

@@ -23,7 +23,7 @@ function createFakeStore() {
     },
     async listSecurityEventsForUser(filter) {
       listCalls.push(filter);
-      return [] as SecurityEvent[];
+      return { events: [] as SecurityEvent[] };
     }
   };
 
@@ -113,8 +113,40 @@ describe("DefaultSecurityEventService", () => {
         eventTypes: ["login_failed", "session_revoked"],
         outcomes: ["failure"],
         riskLevels: ["medium", "high"],
+        cursor: undefined,
         limit: 25
       }
     ]);
+  });
+
+  it("returns an opaque cursor for the next page", async () => {
+    const listCalls: SecurityEventFilter[] = [];
+    const nextCursor = {
+      createdAt: new Date("2026-06-01T12:00:00.000Z"),
+      id: "event-id" as SecurityEventId
+    };
+    const store = {
+      async createSecurityEvent(input: CreateSecurityEventInput) {
+        return {
+          id: "event-id" as SecurityEventId,
+          createdAt: nextCursor.createdAt,
+          ...input
+        };
+      },
+      async listSecurityEventsForUser(filter: SecurityEventFilter) {
+        listCalls.push(filter);
+        return {
+          events: [] as SecurityEvent[],
+          nextCursor
+        };
+      }
+    } satisfies Pick<IdentityStore, "createSecurityEvent" | "listSecurityEventsForUser">;
+    const service = new DefaultSecurityEventService(store);
+
+    const firstPage = await service.listForUser("user-id" as UserId);
+    await service.listForUser("user-id" as UserId, { cursor: firstPage.nextCursor });
+
+    expect(firstPage.nextCursor).toBeTypeOf("string");
+    expect(listCalls[1]?.cursor).toEqual(nextCursor);
   });
 });

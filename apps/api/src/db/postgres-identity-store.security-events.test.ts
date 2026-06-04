@@ -80,7 +80,8 @@ describe("PostgresIdentityStore security events", () => {
       context: {}
     });
 
-    const events = await context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 });
+    const page = await context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 });
+    const events = page.events;
 
     expect(events).toHaveLength(2);
     expect(events.map((event) => event.eventType)).toEqual(["login_succeeded", "signup_started"]);
@@ -110,9 +111,51 @@ describe("PostgresIdentityStore security events", () => {
       context: {}
     });
 
-    await expect(
-      context.store.listSecurityEventsForUser({ userId: user.id, limit: 1 })
-    ).resolves.toHaveLength(1);
+    const page = await context.store.listSecurityEventsForUser({ userId: user.id, limit: 1 });
+
+    expect(page.events).toHaveLength(1);
+    expect(page.nextCursor).toBeDefined();
+  });
+
+  it("paginates security events with the next cursor", async () => {
+    const user = await createTestUser(context);
+
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "signup_started",
+      outcome: "pending",
+      riskLevel: "low",
+      metadata: { page: "last" },
+      context: {}
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_failed",
+      outcome: "failure",
+      riskLevel: "medium",
+      metadata: { page: "first" },
+      context: {}
+    });
+
+    const firstPage = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      limit: 1
+    });
+    const secondPage = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      cursor: firstPage.nextCursor,
+      limit: 1
+    });
+
+    expect(firstPage.events.map((event) => event.eventType)).toEqual(["login_failed"]);
+    expect(firstPage.nextCursor).toBeDefined();
+    expect(secondPage.events.map((event) => event.eventType)).toEqual(["signup_started"]);
+    expect(secondPage.nextCursor).toBeUndefined();
   });
 
   it("filters listed security events by type", async () => {
@@ -139,11 +182,12 @@ describe("PostgresIdentityStore security events", () => {
       context: {}
     });
 
-    const events = await context.store.listSecurityEventsForUser({
+    const page = await context.store.listSecurityEventsForUser({
       userId: user.id,
       eventTypes: ["login_failed"],
       limit: 10
     });
+    const events = page.events;
 
     expect(events.map((event) => event.eventType)).toEqual(["login_failed"]);
   });
@@ -182,12 +226,13 @@ describe("PostgresIdentityStore security events", () => {
       context: {}
     });
 
-    const events = await context.store.listSecurityEventsForUser({
+    const page = await context.store.listSecurityEventsForUser({
       userId: user.id,
       outcomes: ["failure", "pending"],
       riskLevels: ["medium", "high"],
       limit: 10
     });
+    const events = page.events;
 
     expect(events.map((event) => event.eventType).sort()).toEqual([
       "login_failed",
