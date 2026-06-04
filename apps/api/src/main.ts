@@ -87,7 +87,12 @@ await registerPasskeyRoutes(app, {
   loginFinishService,
   loginStartService,
   registrationFinishService,
-  registrationStartService
+  registrationStartService,
+  sessionCookie: {
+    name: config.SESSION_COOKIE_NAME,
+    sameSite: "lax",
+    secure: config.NODE_ENV === "production"
+  }
 });
 
 app.get("/health", async () => ({

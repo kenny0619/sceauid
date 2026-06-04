@@ -1,3 +1,4 @@
+import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type { PasskeyCredentialId, SessionId, UserId } from "../domain/identity.js";
@@ -12,9 +13,15 @@ function createApp(services: {
   finish?: PasskeyRegistrationFinishService;
   loginFinish?: PasskeyLoginFinishService;
   loginStart?: PasskeyLoginStartService;
+  sessionCookie?: {
+    name: string;
+    sameSite?: "lax" | "none" | "strict";
+    secure?: boolean;
+  };
   start?: PasskeyRegistrationStartService;
 }) {
   const app = Fastify();
+  void app.register(cookie);
   void registerPasskeyRoutes(app, {
     loginFinishService: services.loginFinish ?? {
       async finish() {
@@ -35,7 +42,8 @@ function createApp(services: {
       async start() {
         throw new Error("Start service was not configured");
       }
-    }
+    },
+    sessionCookie: services.sessionCookie
   });
   return app;
 }
@@ -185,6 +193,10 @@ describe("passkey routes", () => {
             }
           };
         }
+      },
+      sessionCookie: {
+        name: "sceauid_session",
+        secure: true
       }
     });
 
@@ -226,6 +238,11 @@ describe("passkey routes", () => {
         expiresAt: "2026-07-01T12:00:00.000Z"
       }
     });
+    expect(response.headers["set-cookie"]).toContain("sceauid_session=session-token");
+    expect(response.headers["set-cookie"]).toContain("Path=/");
+    expect(response.headers["set-cookie"]).toContain("HttpOnly");
+    expect(response.headers["set-cookie"]).toContain("Secure");
+    expect(response.headers["set-cookie"]).toContain("SameSite=Lax");
   });
 
   it("maps login finish domain errors to HTTP statuses", async () => {
@@ -235,6 +252,9 @@ describe("passkey routes", () => {
           async finish() {
             throw new Error(message);
           }
+        },
+        sessionCookie: {
+          name: "sceauid_session"
         }
       });
     const payload = {
@@ -277,6 +297,9 @@ describe("passkey routes", () => {
     expect(missingChallenge.statusCode).toBe(404);
     expect(inactiveUser.statusCode).toBe(409);
     expect(failedVerification.statusCode).toBe(400);
+    expect(missingChallenge.headers["set-cookie"]).toBeUndefined();
+    expect(inactiveUser.headers["set-cookie"]).toBeUndefined();
+    expect(failedVerification.headers["set-cookie"]).toBeUndefined();
   });
 
   it("starts passkey registration", async () => {
