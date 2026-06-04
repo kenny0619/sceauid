@@ -35,6 +35,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
 
   const store: Pick<
     IdentityStore,
+    | "completeActiveRecoveryRequest"
     | "consumeRecoveryCode"
     | "countUnusedRecoveryCodesForUser"
     | "createRecoveryRequest"
@@ -42,6 +43,25 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     | "findRecoveryRequestById"
     | "markUnusedRecoveryCodesUsed"
   > = {
+    async completeActiveRecoveryRequest(requestId, completedAt) {
+      expect(requestId).toBe(recoveryRequestId);
+
+      if (
+        !recoveryRequest ||
+        recoveryRequest.status !== "pending" ||
+        recoveryRequest.expiresAt <= completedAt
+      ) {
+        return null;
+      }
+
+      recoveryRequest = {
+        ...recoveryRequest,
+        status: "completed",
+        completedAt
+      };
+
+      return recoveryRequest;
+    },
     async consumeRecoveryCode(consumeUserId, codeHash, usedAt) {
       consumedCodes.push({ codeHash, usedAt, userId: consumeUserId });
       return consumeRecoveryCodeResult;
@@ -99,6 +119,23 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     },
     markRecoveryRequestMissing() {
       recoveryRequest = null;
+    },
+    markRecoveryRequestCompleted() {
+      if (recoveryRequest) {
+        recoveryRequest = {
+          ...recoveryRequest,
+          status: "completed",
+          completedAt: new Date("2026-06-01T12:01:00.000Z")
+        };
+      }
+    },
+    markRecoveryRequestExpired() {
+      if (recoveryRequest) {
+        recoveryRequest = {
+          ...recoveryRequest,
+          expiresAt: new Date("2026-06-01T11:59:00.000Z")
+        };
+      }
     },
     markedUsed,
     recordedEvents,
@@ -266,6 +303,58 @@ describe("DefaultRecoveryCodeService", () => {
 
     await expect(service.recoveryRequestStatus(recoveryRequestId)).rejects.toThrow(
       "Recovery request was not found"
+    );
+  });
+
+  it("completes active recovery requests", async () => {
+    const { recordedEvents, securityEvents, store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, {
+      now: () => new Date("2026-06-01T12:01:00.000Z"),
+      securityEvents
+    });
+
+    await expect(service.completeRecoveryRequest(recoveryRequestId)).resolves.toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequestId,
+        completedAt: new Date("2026-06-01T12:01:00.000Z"),
+        status: "completed"
+      }
+    });
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: userId,
+        eventType: "recovery_completed",
+        metadata: {
+          recoveryRequestId,
+          completedAt: "2026-06-01T12:01:00.000Z"
+        },
+        outcome: "success",
+        riskLevel: "medium",
+        userId
+      }
+    ]);
+  });
+
+  it("rejects expired recovery request completion", async () => {
+    const { markRecoveryRequestExpired, store } = createFakeStore();
+    markRecoveryRequestExpired();
+    const service = new DefaultRecoveryCodeService(store, {
+      now: () => new Date("2026-06-01T12:01:00.000Z")
+    });
+
+    await expect(service.completeRecoveryRequest(recoveryRequestId)).rejects.toThrow(
+      "Recovery request is expired"
+    );
+  });
+
+  it("rejects non-pending recovery request completion", async () => {
+    const { markRecoveryRequestCompleted, store } = createFakeStore();
+    markRecoveryRequestCompleted();
+    const service = new DefaultRecoveryCodeService(store);
+
+    await expect(service.completeRecoveryRequest(recoveryRequestId)).rejects.toThrow(
+      "Recovery request is not pending"
     );
   });
 });
