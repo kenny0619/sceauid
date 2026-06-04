@@ -73,7 +73,11 @@ async function recordSessionRevoked(
       metadata: {
         actorSessionId: input.actorSessionId,
         reason: input.reason,
-        self: input.actorSessionId === input.targetSession.id
+        self: input.actorSessionId === input.targetSession.id,
+        targetCreatedAt: input.targetSession.createdAt.toISOString(),
+        targetDeviceLabel: input.targetSession.deviceLabel,
+        targetExpiresAt: input.targetSession.expiresAt.toISOString(),
+        targetUserAgent: input.targetSession.userAgent
       }
     })
     .catch(() => undefined);

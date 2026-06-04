@@ -175,6 +175,22 @@ export class DefaultPasskeyLoginFinishService implements PasskeyLoginFinishServi
         },
         context: input.context
       });
+      await this.recordSecurityEvent({
+        userId: passkey.userId,
+        sessionId: session.session.id,
+        eventType: "session_created",
+        outcome: "success",
+        metadata: {
+          credentialId: passkey.credentialId,
+          deviceLabel: session.session.deviceLabel,
+          expiresAt: session.session.expiresAt.toISOString(),
+          ipHashPresent: session.session.ipHash !== null,
+          loginId: input.loginId,
+          passkeyId: passkey.id,
+          userAgent: session.session.userAgent
+        },
+        context: input.context
+      });
 
       return {
         userId: passkey.userId,
