@@ -277,6 +277,12 @@ export class PostgresIdentityStore implements IdentityStore {
       ...(filter.userId ? [eq(securityEvents.userId, filter.userId)] : []),
       ...(filter.eventTypes && filter.eventTypes.length > 0
         ? [inArray(securityEvents.eventType, filter.eventTypes)]
+        : []),
+      ...(filter.outcomes && filter.outcomes.length > 0
+        ? [inArray(securityEvents.outcome, filter.outcomes)]
+        : []),
+      ...(filter.riskLevels && filter.riskLevels.length > 0
+        ? [inArray(securityEvents.riskLevel, filter.riskLevels)]
         : [])
     ];
 

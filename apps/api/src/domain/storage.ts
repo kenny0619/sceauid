@@ -3,7 +3,9 @@ import type {
   PasskeyCredential,
   RecoveryCode,
   RecoveryRequest,
+  RiskLevel,
   SecurityEvent,
+  SecurityEventOutcome,
   SecurityEventType,
   Session,
   SessionId,
@@ -118,5 +120,7 @@ export type RiskStore = {
 export type SecurityEventFilter = {
   userId?: UserId;
   eventTypes?: SecurityEventType[];
+  outcomes?: SecurityEventOutcome[];
+  riskLevels?: RiskLevel[];
   limit: number;
 };

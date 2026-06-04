@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { SecurityEvent, SecurityEventType } from "../domain/identity.js";
+import type {
+  RiskLevel,
+  SecurityEvent,
+  SecurityEventOutcome,
+  SecurityEventType
+} from "../domain/identity.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { SecurityEventService } from "./security-event-service.js";
 
@@ -30,25 +35,41 @@ const securityEventTypes = [
   "suspicious_activity_flagged"
 ] as const satisfies readonly SecurityEventType[];
 
-const eventTypeQuerySchema = z.preprocess((value) => {
-  if (value === undefined) {
-    return undefined;
-  }
+const securityEventOutcomes = [
+  "failure",
+  "pending",
+  "success"
+] as const satisfies readonly SecurityEventOutcome[];
 
-  const values = Array.isArray(value) ? value : [value];
+const riskLevels = ["high", "low", "medium"] as const satisfies readonly RiskLevel[];
 
-  return values.flatMap((entry) =>
-    typeof entry === "string"
-      ? entry
-          .split(",")
-          .map((eventType) => eventType.trim())
-          .filter(Boolean)
-      : [entry]
-  );
-}, z.array(z.enum(securityEventTypes)).optional());
+function multiValueQuerySchema<T extends readonly [string, ...string[]]>(values: T) {
+  return z.preprocess((value) => {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const entries = Array.isArray(value) ? value : [value];
+
+    return entries.flatMap((entry) =>
+      typeof entry === "string"
+        ? entry
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [entry]
+    );
+  }, z.array(z.enum(values)).optional());
+}
+
+const eventTypeQuerySchema = multiValueQuerySchema(securityEventTypes);
+const outcomeQuerySchema = multiValueQuerySchema(securityEventOutcomes);
+const riskLevelQuerySchema = multiValueQuerySchema(riskLevels);
 
 const listSecurityEventsQuerySchema = z.object({
   eventType: eventTypeQuerySchema,
+  outcome: outcomeQuerySchema,
+  riskLevel: riskLevelQuerySchema,
   limit: z.coerce.number().int().positive().max(100).optional()
 });
 
@@ -101,6 +122,8 @@ export async function registerSecurityEventRoutes(
 
     const events = await dependencies.securityEvents.listForUser(session.userId, {
       eventTypes: query.data.eventType,
+      outcomes: query.data.outcome,
+      riskLevels: query.data.riskLevel,
       limit: query.data.limit
     });
 
