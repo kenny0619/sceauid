@@ -216,6 +216,15 @@ export type ListPasskeysResponse = {
   passkeys: ListedPasskey[];
 };
 
+export type RecoveryCodeStatusResponse = {
+  recoveryCodesConfigured: boolean;
+  unusedRecoveryCodeCount: number;
+};
+
+export type EnrollRecoveryCodesResponse = RecoveryCodeStatusResponse & {
+  codes: string[];
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -316,6 +325,16 @@ export class SceauIDClient {
   async revokePasskey(passkeyId: string): Promise<LogoutResponse> {
     return this.request(`/v1/passkeys/${encodeURIComponent(passkeyId)}`, {
       method: "DELETE"
+    });
+  }
+
+  async recoveryCodeStatus(): Promise<RecoveryCodeStatusResponse> {
+    return this.request("/v1/recovery/status");
+  }
+
+  async enrollRecoveryCodes(): Promise<EnrollRecoveryCodesResponse> {
+    return this.request("/v1/recovery/codes", {
+      method: "POST"
     });
   }
 

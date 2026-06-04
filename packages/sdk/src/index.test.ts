@@ -383,6 +383,63 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("fetches recovery code status with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      recoveryCodesConfigured: true,
+      unusedRecoveryCodeCount: 8
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.recoveryCodeStatus();
+
+    expect(result.unusedRecoveryCodeCount).toBe(8);
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/recovery/status"
+      }
+    ]);
+  });
+
+  it("enrolls recovery codes with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      codes: ["ABCDE-FGHIJ-KLMNO-PQRST"],
+      recoveryCodesConfigured: true,
+      unusedRecoveryCodeCount: 1
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.enrollRecoveryCodes();
+
+    expect(result.codes).toEqual(["ABCDE-FGHIJ-KLMNO-PQRST"]);
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "POST"
+        },
+        url: "https://identity.example.com/v1/recovery/codes"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {
