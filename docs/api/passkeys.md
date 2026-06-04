@@ -201,6 +201,32 @@ Response:
 
 Missing, expired, revoked, or invalid sessions return `401` with `error: "unauthenticated"`.
 
+## Session List
+
+`GET /v1/sessions`
+
+Authenticated clients can list sessions for the current user. The response marks the active cookie-backed session with `current: true`.
+
+Response:
+
+```json
+{
+  "sessions": [
+    {
+      "id": "session_123",
+      "current": true,
+      "deviceLabel": "Safari on macOS",
+      "userAgent": "Mozilla/5.0",
+      "expiresAt": "2026-07-04T12:00:00.000Z",
+      "revokedAt": null,
+      "createdAt": "2026-06-04T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+The response does not expose token hashes or IP hashes.
+
 ## Logout
 
 `DELETE /v1/sessions/current`

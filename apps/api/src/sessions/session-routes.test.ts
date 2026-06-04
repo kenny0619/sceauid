@@ -28,6 +28,7 @@ function createApp(options: {
   authenticatedSession?: Session | null;
   foundUser?: User | null;
   revokedSessionIds?: SessionId[];
+  sessionsForUser?: Session[];
 }) {
   const app = Fastify();
   void app.register(cookie);
@@ -40,6 +41,10 @@ function createApp(options: {
       async authenticate(token) {
         expect(token).toBe("session-token");
         return options.authenticatedSession ?? null;
+      },
+      async listForUser(userId) {
+        expect(userId).toBe(user.id);
+        return options.sessionsForUser ?? [];
       },
       async revoke(sessionId) {
         options.revokedSessionIds?.push(sessionId);
@@ -57,6 +62,96 @@ function createApp(options: {
 }
 
 describe("session routes", () => {
+  it("lists sessions for the authenticated user", async () => {
+    const otherSession: Session = {
+      ...session,
+      id: "other-session-id" as SessionId,
+      deviceLabel: "Chrome on Windows",
+      userAgent: "other-agent",
+      expiresAt: new Date("2026-07-02T12:00:00.000Z"),
+      revokedAt: new Date("2026-06-03T12:00:00.000Z"),
+      createdAt: new Date("2026-06-02T12:00:00.000Z")
+    };
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      sessionsForUser: [session, otherSession]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sessions",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      sessions: [
+        {
+          id: "session-id",
+          current: true,
+          deviceLabel: "Safari on macOS",
+          userAgent: "test-agent",
+          expiresAt: "2026-07-01T12:00:00.000Z",
+          revokedAt: null,
+          createdAt: "2026-06-01T12:00:00.000Z"
+        },
+        {
+          id: "other-session-id",
+          current: false,
+          deviceLabel: "Chrome on Windows",
+          userAgent: "other-agent",
+          expiresAt: "2026-07-02T12:00:00.000Z",
+          revokedAt: "2026-06-03T12:00:00.000Z",
+          createdAt: "2026-06-02T12:00:00.000Z"
+        }
+      ]
+    });
+  });
+
+  it("rejects session list requests without a session cookie", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      sessionsForUser: [session]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sessions"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session cookie was not found"
+    });
+  });
+
+  it("rejects session list requests with an invalid session", async () => {
+    const app = createApp({
+      authenticatedSession: null,
+      foundUser: user,
+      sessionsForUser: [session]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sessions",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session is invalid or expired"
+    });
+  });
+
   it("returns the current user and session for a valid session cookie", async () => {
     const app = createApp({
       authenticatedSession: session,

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { UserId } from "../domain/identity.js";
+import type { Session, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SessionService } from "./session-service.js";
 
@@ -12,7 +12,7 @@ export type SessionCookieOptions = {
 
 export type SessionRoutesDependencies = {
   sessionCookie: SessionCookieOptions;
-  sessionService: Pick<SessionService, "authenticate" | "revoke">;
+  sessionService: Pick<SessionService, "authenticate" | "listForUser" | "revoke">;
   store: Pick<IdentityStore, "findUserById">;
 };
 
@@ -36,10 +36,48 @@ function clearSessionCookie(
   });
 }
 
+function serializeSession(session: Session, currentSessionId: string) {
+  return {
+    id: session.id,
+    current: session.id === currentSessionId,
+    deviceLabel: session.deviceLabel,
+    userAgent: session.userAgent,
+    expiresAt: session.expiresAt.toISOString(),
+    revokedAt: session.revokedAt?.toISOString() ?? null,
+    createdAt: session.createdAt.toISOString()
+  };
+}
+
 export async function registerSessionRoutes(
   app: FastifyInstance,
   dependencies: SessionRoutesDependencies
 ): Promise<void> {
+  app.get("/v1/sessions", async (request, reply) => {
+    const token = request.cookies[dependencies.sessionCookie.name];
+
+    if (!token) {
+      return reply.status(401).send({
+        error: "unauthenticated",
+        message: "Session cookie was not found"
+      });
+    }
+
+    const currentSession = await dependencies.sessionService.authenticate(token);
+
+    if (!currentSession) {
+      return reply.status(401).send({
+        error: "unauthenticated",
+        message: "Session is invalid or expired"
+      });
+    }
+
+    const sessions = await dependencies.sessionService.listForUser(currentSession.userId);
+
+    return reply.send({
+      sessions: sessions.map((session) => serializeSession(session, currentSession.id))
+    });
+  });
+
   app.get("/v1/sessions/current", async (request, reply) => {
     const token = request.cookies[dependencies.sessionCookie.name];
 
