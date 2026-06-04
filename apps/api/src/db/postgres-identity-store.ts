@@ -206,6 +206,22 @@ export class PostgresIdentityStore implements IdentityStore {
     return codes.length;
   }
 
+  async consumeRecoveryCode(userId: UserId, codeHash: string, usedAt: Date) {
+    const [code] = await this.db
+      .update(recoveryCodes)
+      .set({ usedAt })
+      .where(
+        and(
+          eq(recoveryCodes.userId, userId),
+          eq(recoveryCodes.codeHash, codeHash),
+          isNull(recoveryCodes.usedAt)
+        )
+      )
+      .returning({ id: recoveryCodes.id });
+
+    return Boolean(code);
+  }
+
   async findUnusedRecoveryCode(userId: UserId, codeHash: string) {
     const [code] = await this.db
       .select()

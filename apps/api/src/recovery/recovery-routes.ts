@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import type { UserId } from "../domain/identity.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { RecoveryCodeService } from "./recovery-code-service.js";
 
@@ -7,6 +9,11 @@ export type RecoveryRoutesDependencies = {
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
 };
+
+const redeemRecoveryCodeBodySchema = z.object({
+  code: z.string().min(1),
+  userId: z.string().min(1)
+});
 
 async function authenticateRequest(
   request: { cookies: Record<string, string | undefined> },
@@ -62,5 +69,34 @@ export async function registerRecoveryRoutes(
     }
 
     return reply.send(await dependencies.recoveryCodes.enroll({ userId: session.userId }));
+  });
+
+  app.post("/v1/recovery/codes/redeem", async (request, reply) => {
+    const body = redeemRecoveryCodeBodySchema.safeParse(request.body);
+
+    if (!body.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Recovery code redemption request is invalid"
+      });
+    }
+
+    try {
+      return reply.send(
+        await dependencies.recoveryCodes.redeem({
+          code: body.data.code,
+          userId: body.data.userId as UserId
+        })
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "Recovery code was invalid or already used") {
+        return reply.status(401).send({
+          error: "invalid_recovery_code",
+          message: "Recovery code is invalid or already used"
+        });
+      }
+
+      throw error;
+    }
   });
 }

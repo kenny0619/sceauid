@@ -82,6 +82,7 @@ export type IdentityStore = {
 
   createRecoveryCode(input: CreateRecoveryCodeInput): Promise<RecoveryCode>;
   countUnusedRecoveryCodesForUser(userId: UserId): Promise<number>;
+  consumeRecoveryCode(userId: UserId, codeHash: string, usedAt: Date): Promise<boolean>;
   findUnusedRecoveryCode(userId: UserId, codeHash: string): Promise<RecoveryCode | null>;
   markUnusedRecoveryCodesUsed(userId: UserId, usedAt: Date): Promise<void>;
   markRecoveryCodeUsed(userId: UserId, codeHash: string, usedAt: Date): Promise<void>;
