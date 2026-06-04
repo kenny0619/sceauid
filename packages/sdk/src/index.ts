@@ -193,6 +193,20 @@ export type ListSecurityEventsResponse = {
   events: ListedSecurityEvent[];
 };
 
+export type ListedPasskey = {
+  id: string;
+  credentialId: string;
+  deviceName: string | null;
+  signCount: number;
+  lastUsedAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+};
+
+export type ListPasskeysResponse = {
+  passkeys: ListedPasskey[];
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -264,6 +278,10 @@ export class SceauIDClient {
     const query = searchParams.toString();
 
     return this.request(`/v1/security-events${query ? `?${query}` : ""}`);
+  }
+
+  async passkeys(): Promise<ListPasskeysResponse> {
+    return this.request("/v1/passkeys");
   }
 
   async meta(): Promise<unknown> {
