@@ -7,6 +7,7 @@ import {
 import type { PasskeyCredential, User, UserId } from "../domain/identity.js";
 import { isPasskeyActive } from "../domain/identity.js";
 import type { ChallengeStore, IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 
 export type PasskeyRegistrationStartConfig = {
   rpName: string;
@@ -37,6 +38,7 @@ export type PasskeyRegistrationStartServiceOptions = {
   ttlSeconds?: number;
   createRegistrationId?: () => string;
   generateOptions?: GenerateRegistrationOptions;
+  securityEvents?: SecurityEventService;
 };
 
 const defaultTtlSeconds = 60 * 5;
@@ -82,6 +84,7 @@ export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrati
   private readonly ttlSeconds: number;
   private readonly createRegistrationId: () => string;
   private readonly generateOptions: GenerateRegistrationOptions;
+  private readonly securityEvents: SecurityEventService | undefined;
 
   constructor(
     private readonly identityStore: Pick<IdentityStore, "findUserById" | "listPasskeysForUser">,
@@ -93,6 +96,7 @@ export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrati
     this.ttlSeconds = resolveTtlSeconds(options.ttlSeconds);
     this.createRegistrationId = options.createRegistrationId ?? (() => randomUUID());
     this.generateOptions = options.generateOptions ?? generateRegistrationOptions;
+    this.securityEvents = options.securityEvents;
   }
 
   async start(input: StartPasskeyRegistrationInput): Promise<StartPasskeyRegistrationResult> {
@@ -130,6 +134,22 @@ export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrati
       expiresAt
     });
 
+    await this.recordSecurityEvent({
+      userId: input.userId,
+      eventType: "passkey_registration_started",
+      outcome: "pending",
+      metadata: {
+        registrationId,
+        existingActivePasskeys: excludeActiveCredentials(passkeys).length
+      }
+    });
+
     return { registrationId, options, expiresAt };
+  }
+
+  private async recordSecurityEvent(
+    input: Parameters<SecurityEventService["record"]>[0]
+  ): Promise<void> {
+    await this.securityEvents?.record(input).catch(() => undefined);
   }
 }

@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { InMemoryChallengeStore } from "../challenges/in-memory-challenge-store.js";
 import { createPostgresStoreTestContext, createTestUser } from "../db/postgres-test-harness.js";
+import { DefaultSecurityEventService } from "../security-events/security-event-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
 
 const context = createPostgresStoreTestContext();
@@ -25,6 +26,7 @@ describe("DefaultPasskeyRegistrationStartService integration", () => {
       signCount: 1
     });
     const challengeStore = new InMemoryChallengeStore({ now: () => now });
+    const securityEvents = new DefaultSecurityEventService(context.store);
     const service = new DefaultPasskeyRegistrationStartService(
       context.store,
       challengeStore,
@@ -35,7 +37,8 @@ describe("DefaultPasskeyRegistrationStartService integration", () => {
       },
       {
         now: () => now,
-        createRegistrationId: () => "registration-id"
+        createRegistrationId: () => "registration-id",
+        securityEvents
       }
     );
 
@@ -88,5 +91,16 @@ describe("DefaultPasskeyRegistrationStartService integration", () => {
       },
       expiresAt: new Date("2026-06-01T12:05:00.000Z")
     });
+    await expect(context.store.listSecurityEventsForUser(user.id, 10)).resolves.toMatchObject([
+      {
+        userId: user.id,
+        eventType: "passkey_registration_started",
+        outcome: "pending",
+        metadata: {
+          registrationId: "registration-id",
+          existingActivePasskeys: 1
+        }
+      }
+    ]);
   });
 });

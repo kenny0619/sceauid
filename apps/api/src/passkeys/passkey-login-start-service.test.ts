@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PasskeyCredential, PasskeyCredentialId, User, UserId } from "../domain/identity.js";
 import type { ChallengeRecord, ChallengeStore, IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import {
   DefaultPasskeyLoginStartService,
   type GenerateAuthenticationOptions
@@ -88,6 +89,21 @@ function createFakeGenerateOptions() {
   return { generateOptions, calls };
 }
 
+function createFakeSecurityEvents() {
+  const records: Parameters<SecurityEventService["record"]>[0][] = [];
+  const service: SecurityEventService = {
+    async record(input) {
+      records.push(input);
+      return undefined as never;
+    },
+    async listForUser() {
+      return [];
+    }
+  };
+
+  return { service, records };
+}
+
 function createService(
   options: {
     user?: User | null;
@@ -97,6 +113,7 @@ function createService(
 ) {
   const { store: challengeStore, records } = createFakeChallengeStore();
   const { generateOptions, calls } = createFakeGenerateOptions();
+  const securityEvents = createFakeSecurityEvents();
   const service = new DefaultPasskeyLoginStartService(
     createFakeIdentityStore({
       ...("user" in options ? { user: options.user } : {}),
@@ -111,16 +128,17 @@ function createService(
       now: () => now,
       ttlSeconds: options.ttlSeconds,
       createLoginId: () => "login-id",
-      generateOptions
+      generateOptions,
+      securityEvents: securityEvents.service
     }
   );
 
-  return { service, records, calls };
+  return { service, records, securityEvents, calls };
 }
 
 describe("DefaultPasskeyLoginStartService", () => {
   it("generates scoped authentication options for active user passkeys", async () => {
-    const { service, records, calls } = createService({
+    const { service, records, securityEvents, calls } = createService({
       passkeys: [
         createPasskey("active-credential"),
         createPasskey("revoked-credential", {
@@ -162,10 +180,22 @@ describe("DefaultPasskeyLoginStartService", () => {
         expiresAt: new Date("2026-06-01T12:05:00.000Z")
       }
     ]);
+    expect(securityEvents.records).toEqual([
+      {
+        userId,
+        eventType: "login_started",
+        outcome: "pending",
+        metadata: {
+          loginId: "login-id",
+          mode: "scoped",
+          allowedCredentials: 1
+        }
+      }
+    ]);
   });
 
   it("generates discoverable authentication options without a user id", async () => {
-    const { service, records, calls } = createService({ ttlSeconds: 60 });
+    const { service, records, securityEvents, calls } = createService({ ttlSeconds: 60 });
 
     const result = await service.start();
 
@@ -195,6 +225,18 @@ describe("DefaultPasskeyLoginStartService", () => {
         userId: null
       }
     });
+    expect(securityEvents.records).toEqual([
+      {
+        userId: null,
+        eventType: "login_started",
+        outcome: "pending",
+        metadata: {
+          loginId: "login-id",
+          mode: "discoverable",
+          allowedCredentials: null
+        }
+      }
+    ]);
   });
 
   it("rejects missing, inactive, and passkeyless users", async () => {

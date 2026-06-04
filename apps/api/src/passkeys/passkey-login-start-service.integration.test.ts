@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { InMemoryChallengeStore } from "../challenges/in-memory-challenge-store.js";
 import { createPostgresStoreTestContext, createTestUser } from "../db/postgres-test-harness.js";
+import { DefaultSecurityEventService } from "../security-events/security-event-service.js";
 import { DefaultPasskeyLoginStartService } from "./passkey-login-start-service.js";
 
 const context = createPostgresStoreTestContext();
@@ -25,6 +26,7 @@ describe("DefaultPasskeyLoginStartService integration", () => {
       signCount: 1
     });
     const challengeStore = new InMemoryChallengeStore({ now: () => now });
+    const securityEvents = new DefaultSecurityEventService(context.store);
     const service = new DefaultPasskeyLoginStartService(
       context.store,
       challengeStore,
@@ -34,7 +36,8 @@ describe("DefaultPasskeyLoginStartService integration", () => {
       },
       {
         now: () => now,
-        createLoginId: () => "login-id"
+        createLoginId: () => "login-id",
+        securityEvents
       }
     );
 
@@ -69,6 +72,18 @@ describe("DefaultPasskeyLoginStartService integration", () => {
       },
       expiresAt: new Date("2026-06-01T12:05:00.000Z")
     });
+    await expect(context.store.listSecurityEventsForUser(user.id, 10)).resolves.toMatchObject([
+      {
+        userId: user.id,
+        eventType: "login_started",
+        outcome: "pending",
+        metadata: {
+          loginId: "login-id",
+          mode: "scoped",
+          allowedCredentials: 1
+        }
+      }
+    ]);
   });
 
   it("generates discoverable login options without credential allow-listing", async () => {

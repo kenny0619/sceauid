@@ -5,6 +5,7 @@ import {
 } from "@simplewebauthn/server";
 import type { PasskeyCredential, User, UserId } from "../domain/identity.js";
 import type { ChallengeRecord, ChallengeStore, IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 
 export type PasskeyRegistrationFinishConfig = {
   rpId: string;
@@ -30,6 +31,7 @@ export type VerifyRegistrationResponse = typeof verifyRegistrationResponse;
 
 export type PasskeyRegistrationFinishServiceOptions = {
   verifyRegistration?: VerifyRegistrationResponse;
+  securityEvents?: SecurityEventService;
 };
 
 type RegistrationChallengePayload = {
@@ -83,6 +85,7 @@ function encodePublicKey(publicKey: Uint8Array): string {
 
 export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrationFinishService {
   private readonly verifyRegistration: VerifyRegistrationResponse;
+  private readonly securityEvents: SecurityEventService | undefined;
 
   constructor(
     private readonly identityStore: Pick<
@@ -94,51 +97,87 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
     options: PasskeyRegistrationFinishServiceOptions = {}
   ) {
     this.verifyRegistration = options.verifyRegistration ?? verifyRegistrationResponse;
+    this.securityEvents = options.securityEvents;
   }
 
   async finish(input: FinishPasskeyRegistrationInput): Promise<FinishPasskeyRegistrationResult> {
-    const challenge = await this.challengeStore.consumeChallenge(
-      input.registrationId,
-      "passkey_registration"
-    );
+    let auditUserId: UserId | null = null;
 
-    if (!challenge) {
-      throw new Error("Passkey registration challenge was not found");
+    try {
+      const challenge = await this.challengeStore.consumeChallenge(
+        input.registrationId,
+        "passkey_registration"
+      );
+
+      if (!challenge) {
+        throw new Error("Passkey registration challenge was not found");
+      }
+
+      const userId = challenge.subject as UserId;
+      auditUserId = userId;
+      const user = await this.identityStore.findUserById(userId);
+      assertActiveUser(user);
+
+      const payload = resolveChallengePayload(challenge);
+      const verification = await this.verifyRegistration({
+        response: input.credential,
+        expectedChallenge: payload.challenge,
+        expectedOrigin: payload.origin,
+        expectedRPID: payload.rpId,
+        requireUserVerification: true
+      });
+      assertVerified(verification);
+
+      if (payload.rpId !== this.config.rpId || payload.origin !== this.config.origin) {
+        throw new Error("Passkey registration challenge does not match relying party config");
+      }
+
+      const credentialId = verification.registrationInfo.credential.id;
+      const existingCredential = await this.identityStore.findPasskeyByCredentialId(credentialId);
+
+      if (existingCredential) {
+        throw new Error("Passkey credential already exists");
+      }
+
+      const credential = await this.identityStore.createPasskeyCredential({
+        userId,
+        credentialId,
+        publicKey: encodePublicKey(verification.registrationInfo.credential.publicKey),
+        signCount: verification.registrationInfo.credential.counter,
+        deviceName: input.deviceName ?? null
+      });
+
+      await this.recordSecurityEvent({
+        userId,
+        eventType: "passkey_registered",
+        outcome: "success",
+        metadata: {
+          credentialId,
+          deviceName: input.deviceName ?? null,
+          registrationId: input.registrationId
+        }
+      });
+
+      return { userId, credential };
+    } catch (error) {
+      await this.recordSecurityEvent({
+        userId: auditUserId,
+        eventType: "passkey_registration_failed",
+        outcome: "failure",
+        riskLevel: "medium",
+        metadata: {
+          registrationId: input.registrationId,
+          reason: error instanceof Error ? error.message : "unknown"
+        }
+      });
+
+      throw error;
     }
+  }
 
-    const userId = challenge.subject as UserId;
-    const user = await this.identityStore.findUserById(userId);
-    assertActiveUser(user);
-
-    const payload = resolveChallengePayload(challenge);
-    const verification = await this.verifyRegistration({
-      response: input.credential,
-      expectedChallenge: payload.challenge,
-      expectedOrigin: payload.origin,
-      expectedRPID: payload.rpId,
-      requireUserVerification: true
-    });
-    assertVerified(verification);
-
-    if (payload.rpId !== this.config.rpId || payload.origin !== this.config.origin) {
-      throw new Error("Passkey registration challenge does not match relying party config");
-    }
-
-    const credentialId = verification.registrationInfo.credential.id;
-    const existingCredential = await this.identityStore.findPasskeyByCredentialId(credentialId);
-
-    if (existingCredential) {
-      throw new Error("Passkey credential already exists");
-    }
-
-    const credential = await this.identityStore.createPasskeyCredential({
-      userId,
-      credentialId,
-      publicKey: encodePublicKey(verification.registrationInfo.credential.publicKey),
-      signCount: verification.registrationInfo.credential.counter,
-      deviceName: input.deviceName ?? null
-    });
-
-    return { userId, credential };
+  private async recordSecurityEvent(
+    input: Parameters<SecurityEventService["record"]>[0]
+  ): Promise<void> {
+    await this.securityEvents?.record(input).catch(() => undefined);
   }
 }
