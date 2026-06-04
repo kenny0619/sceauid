@@ -46,10 +46,18 @@ packages/
   nestjs/    NestJS integration package
 
 docs/
+  api/
   architecture/
   security/
   adr/
 ```
+
+## Documentation
+
+- [Passkey API](docs/api/passkeys.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Threat model draft](docs/security/threat-model.md)
+- [Decision records](docs/adr/)
 
 ## Local Development
 
