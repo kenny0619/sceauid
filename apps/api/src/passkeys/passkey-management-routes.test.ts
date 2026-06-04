@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import type {
   PasskeyCredential,
   PasskeyCredentialId,
+  SecurityEvent,
   Session,
   SessionId,
   UserId
 } from "../domain/identity.js";
+import type { RecordSecurityEventInput } from "../security-events/security-event-service.js";
 import { registerPasskeyManagementRoutes } from "./passkey-management-routes.js";
 
 const userId = "user-id" as UserId;
@@ -38,11 +40,33 @@ const passkey: PasskeyCredential = {
 function createApp(options: {
   authenticatedSession?: Session | null;
   passkeys?: PasskeyCredential[];
+  recordedSecurityEvents?: RecordSecurityEventInput[];
+  recordSecurityEventError?: Error;
   revokedCredentials?: Array<{ credentialId: string; revokedAt: Date }>;
 }) {
   const app = Fastify();
   void app.register(cookie);
   void registerPasskeyManagementRoutes(app, {
+    securityEvents: {
+      async record(input) {
+        if (options.recordSecurityEventError) {
+          throw options.recordSecurityEventError;
+        }
+
+        options.recordedSecurityEvents?.push(input);
+        return {
+          id: "security-event-id",
+          createdAt: new Date("2026-06-01T13:00:00.000Z"),
+          ...input,
+          userId: input.userId ?? null,
+          actorUserId: input.actorUserId ?? null,
+          sessionId: input.sessionId ?? null,
+          riskLevel: input.riskLevel ?? "low",
+          metadata: input.metadata ?? {},
+          context: input.context ?? {}
+        } as SecurityEvent;
+      }
+    },
     sessionCookieName: "sceauid_session",
     sessionService: {
       async authenticate(token) {
@@ -136,10 +160,54 @@ describe("passkey management routes", () => {
   });
 
   it("revokes a passkey owned by the authenticated user", async () => {
+    const recordedSecurityEvents: RecordSecurityEventInput[] = [];
     const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
     const app = createApp({
       authenticatedSession: session,
       passkeys: [passkey],
+      recordedSecurityEvents,
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedCredentials).toEqual([
+      {
+        credentialId: "credential-public-id",
+        revokedAt: new Date("2026-06-01T13:00:00.000Z")
+      }
+    ]);
+    expect(recordedSecurityEvents).toEqual([
+      {
+        userId,
+        actorUserId: userId,
+        sessionId: "session-id",
+        eventType: "passkey_removed",
+        outcome: "success",
+        metadata: {
+          actorSessionId: "session-id",
+          deviceName: "MacBook Pro",
+          passkeyId: "passkey-id",
+          revokedAt: "2026-06-01T13:00:00.000Z"
+        }
+      }
+    ]);
+  });
+
+  it("keeps passkey revoke successful when security event recording fails", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      passkeys: [passkey],
+      recordSecurityEventError: new Error("audit sink unavailable"),
       revokedCredentials
     });
 
