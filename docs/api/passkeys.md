@@ -408,12 +408,16 @@ Current events include:
 - `passkey_removed`
 - `session_created`
 - `session_revoked`
+- `recovery_codes_enrolled`
+- `recovery_code_redeemed`
 
 Passkey removal events include metadata for `passkeyId`, `deviceName`, `actorSessionId`, and `revokedAt`.
 
 Session creation events include metadata for `loginId`, `credentialId`, `passkeyId`, `deviceLabel`, `userAgent`, `ipHashPresent`, and `expiresAt`.
 
 Session revocation events include metadata for `reason`, `actorSessionId`, whether the revoked session was the actor's own session, and target session device/timing fields.
+
+Recovery code enrollment events include metadata for `codeCount` and `enrolledAt`. Recovery code redemption events include metadata for `redeemedAt` and use medium risk.
 
 ### List Security Events
 

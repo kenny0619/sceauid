@@ -20,7 +20,7 @@ const session: Session = {
 function createApp(
   options: { authenticatedSession?: Session | null; rejectRedemption?: boolean } = {}
 ) {
-  const enrolledUsers: UserId[] = [];
+  const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
   const redeemedCodes: Array<{ code: string; userId: UserId }> = [];
   const statusUsers: UserId[] = [];
   const app = Fastify();
@@ -29,7 +29,7 @@ function createApp(
   void registerRecoveryRoutes(app, {
     recoveryCodes: {
       async enroll(input) {
-        enrolledUsers.push(input.userId);
+        enrollments.push(input);
         return {
           codes: ["AAAAA-BBBBB-CCCCC-DDDDD"],
           recoveryCodesConfigured: true,
@@ -62,7 +62,7 @@ function createApp(
     }
   });
 
-  return { app, enrolledUsers, redeemedCodes, statusUsers };
+  return { app, enrollments, redeemedCodes, statusUsers };
 }
 
 describe("recovery routes", () => {
@@ -86,7 +86,7 @@ describe("recovery routes", () => {
   });
 
   it("enrolls recovery codes for the authenticated user", async () => {
-    const { app, enrolledUsers } = createApp({ authenticatedSession: session });
+    const { app, enrollments } = createApp({ authenticatedSession: session });
 
     const response = await app.inject({
       method: "POST",
@@ -97,7 +97,12 @@ describe("recovery routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(enrolledUsers).toEqual([userId]);
+    expect(enrollments).toEqual([
+      {
+        actorSessionId: session.id,
+        userId
+      }
+    ]);
     expect(response.json()).toEqual({
       codes: ["AAAAA-BBBBB-CCCCC-DDDDD"],
       recoveryCodesConfigured: true,

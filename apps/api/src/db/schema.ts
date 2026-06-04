@@ -41,6 +41,8 @@ export const securityEventType = pgEnum("security_event_type", [
   "login_failed",
   "session_created",
   "session_revoked",
+  "recovery_codes_enrolled",
+  "recovery_code_redeemed",
   "recovery_started",
   "recovery_verified",
   "recovery_completed",

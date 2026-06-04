@@ -68,7 +68,12 @@ export async function registerRecoveryRoutes(
       return;
     }
 
-    return reply.send(await dependencies.recoveryCodes.enroll({ userId: session.userId }));
+    return reply.send(
+      await dependencies.recoveryCodes.enroll({
+        actorSessionId: session.id,
+        userId: session.userId
+      })
+    );
   });
 
   app.post("/v1/recovery/codes/redeem", async (request, reply) => {
