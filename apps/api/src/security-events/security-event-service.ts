@@ -22,7 +22,12 @@ export type RecordSecurityEventInput = {
 
 export type SecurityEventService = {
   record(input: RecordSecurityEventInput): Promise<SecurityEvent>;
-  listForUser(userId: UserId, limit?: number): Promise<SecurityEvent[]>;
+  listForUser(userId: UserId, input?: ListSecurityEventsInput): Promise<SecurityEvent[]>;
+};
+
+export type ListSecurityEventsInput = {
+  eventTypes?: SecurityEventType[];
+  limit?: number;
 };
 
 const defaultListLimit = 50;
@@ -78,7 +83,11 @@ export class DefaultSecurityEventService implements SecurityEventService {
     });
   }
 
-  async listForUser(userId: UserId, limit?: number): Promise<SecurityEvent[]> {
-    return this.store.listSecurityEventsForUser(userId, normalizeLimit(limit));
+  async listForUser(userId: UserId, input: ListSecurityEventsInput = {}): Promise<SecurityEvent[]> {
+    return this.store.listSecurityEventsForUser({
+      userId,
+      eventTypes: input.eventTypes?.length ? input.eventTypes : undefined,
+      limit: normalizeLimit(input.limit)
+    });
   }
 }

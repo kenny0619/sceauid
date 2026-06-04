@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { SecurityEvent, SecurityEventId, UserId } from "../domain/identity.js";
-import type { CreateSecurityEventInput, IdentityStore } from "../domain/storage.js";
+import type {
+  CreateSecurityEventInput,
+  IdentityStore,
+  SecurityEventFilter
+} from "../domain/storage.js";
 import { DefaultSecurityEventService } from "./security-event-service.js";
 
 function createFakeStore() {
   const createdEvents: CreateSecurityEventInput[] = [];
-  const listCalls: Array<{ userId: UserId; limit: number }> = [];
+  const listCalls: SecurityEventFilter[] = [];
 
   const store: Pick<IdentityStore, "createSecurityEvent" | "listSecurityEventsForUser"> = {
     async createSecurityEvent(input) {
@@ -17,8 +21,8 @@ function createFakeStore() {
         ...input
       };
     },
-    async listSecurityEventsForUser(userId, limit) {
-      listCalls.push({ userId, limit });
+    async listSecurityEventsForUser(filter) {
+      listCalls.push(filter);
       return [] as SecurityEvent[];
     }
   };
@@ -84,10 +88,29 @@ describe("DefaultSecurityEventService", () => {
     const userId = "user-id" as UserId;
 
     await service.listForUser(userId);
-    await service.listForUser(userId, 0);
-    await service.listForUser(userId, 500);
-    await service.listForUser(userId, 10.8);
+    await service.listForUser(userId, { limit: 0 });
+    await service.listForUser(userId, { limit: 500 });
+    await service.listForUser(userId, { limit: 10.8 });
 
     expect(listCalls.map((call) => call.limit)).toEqual([50, 50, 100, 10]);
+  });
+
+  it("passes event type filters to storage", async () => {
+    const { store, listCalls } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+    const userId = "user-id" as UserId;
+
+    await service.listForUser(userId, {
+      eventTypes: ["login_failed", "session_revoked"],
+      limit: 25
+    });
+
+    expect(listCalls).toEqual([
+      {
+        userId,
+        eventTypes: ["login_failed", "session_revoked"],
+        limit: 25
+      }
+    ]);
   });
 });

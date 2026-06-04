@@ -355,7 +355,7 @@ Session revocation events include metadata for `reason`, `actorSessionId`, and w
 
 ### List Security Events
 
-`GET /v1/security-events?limit=50`
+`GET /v1/security-events?limit=50&eventType=login_failed&eventType=session_revoked`
 
 Authenticated clients can fetch the current user's security timeline.
 
@@ -383,6 +383,8 @@ Response:
 ```
 
 `limit` is optional and must be between `1` and `100`.
+
+`eventType` is optional and can be provided more than once or as a comma-separated list.
 
 These events are intended to support account timelines, user-facing security history, investigation workflows, and future webhook delivery.
 
