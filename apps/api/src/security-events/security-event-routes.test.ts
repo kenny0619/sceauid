@@ -46,7 +46,9 @@ const event: SecurityEvent = {
 
 function createApp(options: {
   authenticatedSession?: Session | null;
+  event?: SecurityEvent | null;
   events?: SecurityEvent[];
+  findCalls?: Array<{ userId: UserId; eventId: SecurityEventId }>;
   nextCursor?: string;
   listCalls?: Array<{ userId: UserId; input?: ListSecurityEventsInput }>;
 }) {
@@ -54,6 +56,10 @@ function createApp(options: {
   void app.register(cookie);
   void registerSecurityEventRoutes(app, {
     securityEvents: {
+      async findForUser(userId, eventId) {
+        options.findCalls?.push({ userId, eventId });
+        return options.event ?? null;
+      },
       async listForUser(userId, input) {
         options.listCalls?.push({ userId, input });
         return {
@@ -159,6 +165,104 @@ describe("security event routes", () => {
     ]);
     expect(response.json()).toMatchObject({
       nextCursor: "next-page-token"
+    });
+  });
+
+  it("returns a security event detail for the authenticated user", async () => {
+    const findCalls: Array<{ userId: UserId; eventId: SecurityEventId }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      event,
+      findCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events/event-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(findCalls).toEqual([{ userId, eventId: "event-id" as SecurityEventId }]);
+    expect(response.json()).toEqual({
+      event: {
+        id: "event-id",
+        userId: "user-id",
+        actorUserId: "user-id",
+        sessionId: "session-id",
+        eventType: "session_revoked",
+        outcome: "success",
+        riskLevel: "low",
+        metadata: {
+          reason: "targeted_revoke"
+        },
+        context: {
+          userAgent: "test-agent"
+        },
+        createdAt: "2026-06-01T12:01:00.000Z"
+      }
+    });
+  });
+
+  it("returns not found when a security event is missing or outside the user", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      event: null
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events/event-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "security_event_not_found",
+      message: "Security event was not found"
+    });
+  });
+
+  it("rejects security event detail requests without a session cookie", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      event
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events/event-id"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session cookie was not found"
+    });
+  });
+
+  it("rejects security event detail requests with an invalid session", async () => {
+    const app = createApp({
+      authenticatedSession: null,
+      event
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events/event-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session is invalid or expired"
     });
   });
 

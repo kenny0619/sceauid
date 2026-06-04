@@ -9,9 +9,13 @@ import { DefaultSecurityEventService } from "./security-event-service.js";
 
 function createFakeStore() {
   const createdEvents: CreateSecurityEventInput[] = [];
+  const findCalls: Array<{ userId: UserId; eventId: SecurityEventId }> = [];
   const listCalls: SecurityEventFilter[] = [];
 
-  const store: Pick<IdentityStore, "createSecurityEvent" | "listSecurityEventsForUser"> = {
+  const store: Pick<
+    IdentityStore,
+    "createSecurityEvent" | "findSecurityEventForUser" | "listSecurityEventsForUser"
+  > = {
     async createSecurityEvent(input) {
       createdEvents.push(input);
 
@@ -21,16 +25,31 @@ function createFakeStore() {
         ...input
       };
     },
+    async findSecurityEventForUser(userId, eventId) {
+      findCalls.push({ userId, eventId });
+      return null;
+    },
     async listSecurityEventsForUser(filter) {
       listCalls.push(filter);
       return { events: [] as SecurityEvent[] };
     }
   };
 
-  return { store, createdEvents, listCalls };
+  return { store, createdEvents, findCalls, listCalls };
 }
 
 describe("DefaultSecurityEventService", () => {
+  it("finds a security event for a user", async () => {
+    const { store, findCalls } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+    const userId = "user-id" as UserId;
+    const eventId = "event-id" as SecurityEventId;
+
+    await service.findForUser(userId, eventId);
+
+    expect(findCalls).toEqual([{ userId, eventId }]);
+  });
+
   it("records security events with safe defaults", async () => {
     const { store, createdEvents } = createFakeStore();
     const service = new DefaultSecurityEventService(store);
@@ -133,6 +152,9 @@ describe("DefaultSecurityEventService", () => {
           ...input
         };
       },
+      async findSecurityEventForUser() {
+        return null;
+      },
       async listSecurityEventsForUser(filter: SecurityEventFilter) {
         listCalls.push(filter);
         return {
@@ -140,7 +162,10 @@ describe("DefaultSecurityEventService", () => {
           nextCursor
         };
       }
-    } satisfies Pick<IdentityStore, "createSecurityEvent" | "listSecurityEventsForUser">;
+    } satisfies Pick<
+      IdentityStore,
+      "createSecurityEvent" | "findSecurityEventForUser" | "listSecurityEventsForUser"
+    >;
     const service = new DefaultSecurityEventService(store);
 
     const firstPage = await service.listForUser("user-id" as UserId);
