@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { SessionId, UserId } from "../domain/identity.js";
-import type { CreateRecoveryCodeInput, IdentityStore } from "../domain/storage.js";
+import type { RecoveryRequestId, SessionId, UserId } from "../domain/identity.js";
+import type {
+  CreateRecoveryCodeInput,
+  CreateRecoveryRequestInput,
+  IdentityStore
+} from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import {
   DefaultRecoveryCodeService,
@@ -10,10 +14,12 @@ import {
 
 const userId = "user-id" as UserId;
 const sessionId = "session-id" as SessionId;
+const recoveryRequestId = "recovery-request-id" as RecoveryRequestId;
 
 function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   const consumedCodes: Array<{ codeHash: string; usedAt: Date; userId: UserId }> = [];
   const createdCodes: CreateRecoveryCodeInput[] = [];
+  const createdRecoveryRequests: CreateRecoveryRequestInput[] = [];
   const markedUsed: Array<{ userId: UserId; usedAt: Date }> = [];
   const recordedEvents: Array<Parameters<SecurityEventService["record"]>[0]> = [];
   let consumeRecoveryCodeResult = true;
@@ -22,6 +28,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     IdentityStore,
     | "consumeRecoveryCode"
     | "countUnusedRecoveryCodesForUser"
+    | "createRecoveryRequest"
     | "createRecoveryCode"
     | "markUnusedRecoveryCodesUsed"
   > = {
@@ -36,6 +43,18 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     async createRecoveryCode(input) {
       createdCodes.push(input);
       return undefined as never;
+    },
+    async createRecoveryRequest(input) {
+      createdRecoveryRequests.push(input);
+      return {
+        id: recoveryRequestId,
+        userId: input.userId,
+        status: "pending",
+        riskLevel: input.riskLevel,
+        expiresAt: input.expiresAt,
+        completedAt: null,
+        createdAt: new Date("2026-06-01T12:00:00.000Z")
+      };
     },
     async markUnusedRecoveryCodesUsed(markUserId, usedAt) {
       markedUsed.push({ userId: markUserId, usedAt });
@@ -60,6 +79,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   return {
     consumedCodes,
     createdCodes,
+    createdRecoveryRequests,
     markRecoveryCodeInvalid() {
       consumeRecoveryCodeResult = false;
     },
@@ -134,13 +154,22 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("redeems a recovery code using its normalized hash", async () => {
-    const { consumedCodes, recordedEvents, securityEvents, store } = createFakeStore();
+    const { consumedCodes, createdRecoveryRequests, recordedEvents, securityEvents, store } =
+      createFakeStore();
     const service = new DefaultRecoveryCodeService(store, {
       now: () => new Date("2026-06-01T12:00:00.000Z"),
+      recoveryRequestTtlSeconds: 300,
       securityEvents
     });
 
-    await expect(service.redeem({ code: "abcd-1234 ef", userId })).resolves.toEqual({ ok: true });
+    await expect(service.redeem({ code: "abcd-1234 ef", userId })).resolves.toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequestId,
+        expiresAt: new Date("2026-06-01T12:05:00.000Z"),
+        riskLevel: "medium"
+      }
+    });
 
     expect(consumedCodes).toEqual([
       {
@@ -149,11 +178,19 @@ describe("DefaultRecoveryCodeService", () => {
         userId
       }
     ]);
+    expect(createdRecoveryRequests).toEqual([
+      {
+        userId,
+        riskLevel: "medium",
+        expiresAt: new Date("2026-06-01T12:05:00.000Z")
+      }
+    ]);
     expect(recordedEvents).toEqual([
       {
         actorUserId: userId,
         eventType: "recovery_code_redeemed",
         metadata: {
+          recoveryRequestId,
           redeemedAt: "2026-06-01T12:00:00.000Z"
         },
         outcome: "success",
