@@ -174,6 +174,33 @@ On successful login, the API also sets an HTTP-only session cookie. The cookie n
 
 The JSON `session.token` is kept for SDKs, native apps, CLIs, and server-side integrations that cannot rely on browser cookies.
 
+## Current Session
+
+`GET /v1/sessions/current`
+
+Browser clients can use this endpoint to authenticate the current request from the HTTP-only session cookie.
+
+Response:
+
+```json
+{
+  "user": {
+    "id": "user_123",
+    "displayName": "Ibukunoluwa Kehinde",
+    "status": "active"
+  },
+  "session": {
+    "id": "session_123",
+    "deviceLabel": "Safari on macOS",
+    "userAgent": "Mozilla/5.0",
+    "expiresAt": "2026-07-04T12:00:00.000Z",
+    "createdAt": "2026-06-04T12:00:00.000Z"
+  }
+}
+```
+
+Missing, expired, revoked, or invalid sessions return `401` with `error: "unauthenticated"`.
+
 ## Session Cookie Behavior
 
 The default cookie behavior is:
