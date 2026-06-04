@@ -12,6 +12,7 @@ import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-regis
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
 import { DefaultSecurityEventService } from "./security-events/security-event-service.js";
 import { DefaultSessionService } from "./sessions/session-service.js";
+import { registerSessionRoutes } from "./sessions/session-routes.js";
 
 const config = loadConfig();
 const databaseClient = createDatabaseClient(config);
@@ -93,6 +94,11 @@ await registerPasskeyRoutes(app, {
     sameSite: "lax",
     secure: config.NODE_ENV === "production"
   }
+});
+await registerSessionRoutes(app, {
+  sessionCookieName: config.SESSION_COOKIE_NAME,
+  sessionService,
+  store: identityStore
 });
 
 app.get("/health", async () => ({
