@@ -306,6 +306,26 @@ Response:
 
 Redemption does not require an active session. The API normalizes and hashes the submitted code, atomically marks a matching unused code as used, and creates a short-lived pending recovery request. Invalid, already used, or unknown user/code pairs return `401` with `error: "invalid_recovery_code"`.
 
+### Recovery Request Status
+
+`GET /v1/recovery/requests/:recoveryRequestId`
+
+Response:
+
+```json
+{
+  "recoveryRequest": {
+    "id": "recovery_request_123",
+    "active": true,
+    "expiresAt": "2026-06-01T12:15:00.000Z",
+    "riskLevel": "medium",
+    "status": "pending"
+  }
+}
+```
+
+Pending requests are reported as `expired` and `active: false` after their expiry time. Unknown request IDs return `404` with `error: "recovery_request_not_found"`.
+
 ## Session List
 
 `GET /v1/sessions`
