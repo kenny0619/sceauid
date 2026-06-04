@@ -148,15 +148,77 @@ export class SceauIDClient {
     this.fetcher = options.fetch ?? fetch;
   }
 
+  async startPasskeyRegistration(
+    input: PasskeyRegistrationStartInput
+  ): Promise<PasskeyRegistrationStartResponse> {
+    return this.request("/v1/passkeys/registration/start", {
+      body: input,
+      method: "POST"
+    });
+  }
+
+  async finishPasskeyRegistration(
+    input: PasskeyRegistrationFinishInput
+  ): Promise<PasskeyRegistrationFinishResponse> {
+    return this.request("/v1/passkeys/registration/finish", {
+      body: input,
+      method: "POST"
+    });
+  }
+
+  async startPasskeyLogin(input: PasskeyLoginStartInput = {}): Promise<PasskeyLoginStartResponse> {
+    return this.request("/v1/passkeys/login/start", {
+      body: input,
+      method: "POST"
+    });
+  }
+
+  async finishPasskeyLogin(input: PasskeyLoginFinishInput): Promise<PasskeyLoginFinishResponse> {
+    return this.request("/v1/passkeys/login/finish", {
+      body: input,
+      method: "POST"
+    });
+  }
+
   async meta(): Promise<unknown> {
-    const response = await this.fetcher(`${this.baseUrl}/v1/meta`, {
-      credentials: "include"
+    return this.request("/v1/meta");
+  }
+
+  private async request<TResponse>(
+    path: string,
+    options: {
+      body?: unknown;
+      method?: string;
+    } = {}
+  ): Promise<TResponse> {
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(options.body === undefined ? {} : { "Content-Type": "application/json" })
+      },
+      method: options.method ?? "GET"
     });
 
     if (!response.ok) {
-      throw new Error(`SceauID request failed with status ${response.status}`);
+      throw new SceauIDError(response.status, await parseErrorBody(response));
     }
 
-    return response.json();
+    return response.json() as Promise<TResponse>;
   }
+}
+
+async function parseErrorBody(response: SceauIDFetchResponse): Promise<SceauIDErrorBody> {
+  try {
+    const body = await response.json();
+
+    if (body && typeof body === "object") {
+      return body as SceauIDErrorBody;
+    }
+  } catch {
+    return {};
+  }
+
+  return {};
 }
