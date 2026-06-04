@@ -15,6 +15,7 @@ import type {
   IdentityStore,
   UpdatePasskeyUsageInput
 } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import type { CreatedSession, SessionService } from "../sessions/session-service.js";
 import type { SessionToken } from "../sessions/session-token.js";
 import {
@@ -180,6 +181,21 @@ function createFakeVerifyAuthentication(verified = true) {
   return { verifyAuthentication, calls };
 }
 
+function createFakeSecurityEvents() {
+  const records: Parameters<SecurityEventService["record"]>[0][] = [];
+  const service: SecurityEventService = {
+    async record(input) {
+      records.push(input);
+      return undefined as never;
+    },
+    async listForUser() {
+      return [];
+    }
+  };
+
+  return { service, records };
+}
+
 function createService(
   options: {
     challenge?: ChallengeRecord | null;
@@ -197,6 +213,7 @@ function createService(
   });
   const sessionService = createFakeSessionService();
   const verification = createFakeVerifyAuthentication(options.verified ?? true);
+  const securityEvents = createFakeSecurityEvents();
   const service = new DefaultPasskeyLoginFinishService(
     identityStore.store,
     challengeStore.store,
@@ -207,16 +224,17 @@ function createService(
     },
     {
       now: () => now,
-      verifyAuthentication: verification.verifyAuthentication
+      verifyAuthentication: verification.verifyAuthentication,
+      securityEvents: securityEvents.service
     }
   );
 
-  return { service, challengeStore, identityStore, sessionService, verification };
+  return { service, challengeStore, identityStore, securityEvents, sessionService, verification };
 }
 
 describe("DefaultPasskeyLoginFinishService", () => {
   it("verifies authentication, updates passkey usage, and creates a session", async () => {
-    const { service, challengeStore, identityStore, sessionService, verification } =
+    const { service, challengeStore, identityStore, securityEvents, sessionService, verification } =
       createService();
 
     const result = await service.finish({
@@ -268,6 +286,22 @@ describe("DefaultPasskeyLoginFinishService", () => {
       },
       session: sessionService.createdSession
     });
+    expect(securityEvents.records).toEqual([
+      {
+        userId,
+        sessionId: "session-id",
+        eventType: "login_succeeded",
+        outcome: "success",
+        metadata: {
+          credentialId: "credential-id",
+          loginId: "login-id"
+        },
+        context: {
+          ipHash: "ip-hash",
+          userAgent: "test-agent"
+        }
+      }
+    ]);
   });
 
   it("rejects missing challenges, credentials, users, and failed verification", async () => {
@@ -292,12 +326,27 @@ describe("DefaultPasskeyLoginFinishService", () => {
       })
     ).rejects.toThrow("User cannot finish passkey login unless active");
 
+    const failedVerification = createService({ verified: false });
     await expect(
-      createService({ verified: false }).service.finish({
+      failedVerification.service.finish({
         loginId: "login-id",
         credential: createCredentialResponse()
       })
     ).rejects.toThrow("Passkey login verification failed");
+    expect(failedVerification.securityEvents.records).toEqual([
+      {
+        userId,
+        eventType: "login_failed",
+        outcome: "failure",
+        riskLevel: "medium",
+        metadata: {
+          credentialId: "credential-id",
+          loginId: "login-id",
+          reason: "Passkey login verification failed"
+        },
+        context: undefined
+      }
+    ]);
   });
 
   it("rejects mismatched scoped login challenges and malformed payloads", async () => {

@@ -8,6 +8,7 @@ import type {
   CreatePasskeyCredentialInput,
   IdentityStore
 } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import {
   DefaultPasskeyRegistrationFinishService,
   type VerifyRegistrationResponse
@@ -150,6 +151,21 @@ function createFakeVerifyRegistration(verified = true) {
   return { verifyRegistration, calls };
 }
 
+function createFakeSecurityEvents() {
+  const records: Parameters<SecurityEventService["record"]>[0][] = [];
+  const service: SecurityEventService = {
+    async record(input) {
+      records.push(input);
+      return undefined as never;
+    },
+    async listForUser() {
+      return [];
+    }
+  };
+
+  return { service, records };
+}
+
 function createService(
   options: {
     challenge?: ChallengeRecord | null;
@@ -166,6 +182,7 @@ function createService(
     ...("existingCredential" in options ? { existingCredential: options.existingCredential } : {})
   });
   const verification = createFakeVerifyRegistration(options.verified ?? true);
+  const securityEvents = createFakeSecurityEvents();
   const service = new DefaultPasskeyRegistrationFinishService(
     identityStore.store,
     challengeStore.store,
@@ -174,16 +191,18 @@ function createService(
       origin: "http://localhost:3000"
     },
     {
-      verifyRegistration: verification.verifyRegistration
+      verifyRegistration: verification.verifyRegistration,
+      securityEvents: securityEvents.service
     }
   );
 
-  return { service, challengeStore, identityStore, verification };
+  return { service, challengeStore, identityStore, securityEvents, verification };
 }
 
 describe("DefaultPasskeyRegistrationFinishService", () => {
   it("verifies registration and persists the passkey credential", async () => {
-    const { service, challengeStore, identityStore, verification } = createService();
+    const { service, challengeStore, identityStore, securityEvents, verification } =
+      createService();
 
     const result = await service.finish({
       registrationId: "registration-id",
@@ -219,6 +238,18 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
         deviceName: "MacBook"
       }
     });
+    expect(securityEvents.records).toEqual([
+      {
+        userId,
+        eventType: "passkey_registered",
+        outcome: "success",
+        metadata: {
+          credentialId: "credential-id",
+          deviceName: "MacBook",
+          registrationId: "registration-id"
+        }
+      }
+    ]);
   });
 
   it("rejects missing challenges and failed verification", async () => {
@@ -229,12 +260,25 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
       })
     ).rejects.toThrow("Passkey registration challenge was not found");
 
+    const failedVerification = createService({ verified: false });
     await expect(
-      createService({ verified: false }).service.finish({
+      failedVerification.service.finish({
         registrationId: "registration-id",
         credential: createCredentialResponse()
       })
     ).rejects.toThrow("Passkey registration verification failed");
+    expect(failedVerification.securityEvents.records).toEqual([
+      {
+        userId,
+        eventType: "passkey_registration_failed",
+        outcome: "failure",
+        riskLevel: "medium",
+        metadata: {
+          registrationId: "registration-id",
+          reason: "Passkey registration verification failed"
+        }
+      }
+    ]);
   });
 
   it("rejects inactive users, malformed payloads, and duplicate credentials", async () => {

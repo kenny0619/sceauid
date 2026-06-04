@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PasskeyCredential, PasskeyCredentialId, User, UserId } from "../domain/identity.js";
 import type { ChallengeRecord, ChallengeStore, IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import {
   DefaultPasskeyRegistrationStartService,
   type GenerateRegistrationOptions
@@ -98,10 +99,26 @@ function createFakeGenerateOptions() {
   return { generateOptions, calls };
 }
 
+function createFakeSecurityEvents() {
+  const records: Parameters<SecurityEventService["record"]>[0][] = [];
+  const service: SecurityEventService = {
+    async record(input) {
+      records.push(input);
+      return undefined as never;
+    },
+    async listForUser() {
+      return [];
+    }
+  };
+
+  return { service, records };
+}
+
 describe("DefaultPasskeyRegistrationStartService", () => {
   it("generates registration options and stores a short-lived ceremony", async () => {
     const { store: challengeStore, records } = createFakeChallengeStore();
     const { generateOptions, calls } = createFakeGenerateOptions();
+    const securityEvents = createFakeSecurityEvents();
     const service = new DefaultPasskeyRegistrationStartService(
       createFakeIdentityStore({
         passkeys: [
@@ -120,7 +137,8 @@ describe("DefaultPasskeyRegistrationStartService", () => {
       {
         now: () => now,
         createRegistrationId: () => "registration-id",
-        generateOptions
+        generateOptions,
+        securityEvents: securityEvents.service
       }
     );
 
@@ -170,6 +188,17 @@ describe("DefaultPasskeyRegistrationStartService", () => {
           origin: "http://localhost:3000"
         },
         expiresAt: new Date("2026-06-01T12:05:00.000Z")
+      }
+    ]);
+    expect(securityEvents.records).toEqual([
+      {
+        userId,
+        eventType: "passkey_registration_started",
+        outcome: "pending",
+        metadata: {
+          registrationId: "registration-id",
+          existingActivePasskeys: 1
+        }
       }
     ]);
   });
