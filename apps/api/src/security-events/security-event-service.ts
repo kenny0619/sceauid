@@ -7,7 +7,7 @@ import type {
   SessionId,
   UserId
 } from "../domain/identity.js";
-import type { IdentityStore } from "../domain/storage.js";
+import type { IdentityStore, SecurityEventCursor } from "../domain/storage.js";
 
 export type RecordSecurityEventInput = {
   userId?: UserId | null;
@@ -22,15 +22,28 @@ export type RecordSecurityEventInput = {
 
 export type SecurityEventService = {
   record(input: RecordSecurityEventInput): Promise<SecurityEvent>;
-  listForUser(userId: UserId, input?: ListSecurityEventsInput): Promise<SecurityEvent[]>;
+  listForUser(userId: UserId, input?: ListSecurityEventsInput): Promise<ListSecurityEventsPage>;
 };
 
 export type ListSecurityEventsInput = {
+  cursor?: string;
   eventTypes?: SecurityEventType[];
   outcomes?: SecurityEventOutcome[];
   riskLevels?: RiskLevel[];
   limit?: number;
 };
+
+export type ListSecurityEventsPage = {
+  events: SecurityEvent[];
+  nextCursor?: string;
+};
+
+export class InvalidSecurityEventCursorError extends Error {
+  constructor() {
+    super("Security event cursor is invalid");
+    this.name = "InvalidSecurityEventCursorError";
+  }
+}
 
 const defaultListLimit = 50;
 const maxListLimit = 100;
@@ -67,6 +80,49 @@ function normalizeLimit(limit: number | undefined): number {
   return Math.min(Math.floor(limit), maxListLimit);
 }
 
+function encodeCursor(cursor: SecurityEventCursor): string {
+  return Buffer.from(
+    JSON.stringify({
+      createdAt: cursor.createdAt.toISOString(),
+      id: cursor.id
+    })
+  ).toString("base64url");
+}
+
+function decodeCursor(cursor: string | undefined): SecurityEventCursor | undefined {
+  if (cursor === undefined) {
+    return undefined;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      createdAt?: unknown;
+      id?: unknown;
+    };
+
+    if (typeof decoded.createdAt !== "string" || typeof decoded.id !== "string") {
+      throw new InvalidSecurityEventCursorError();
+    }
+
+    const createdAt = new Date(decoded.createdAt);
+
+    if (Number.isNaN(createdAt.getTime())) {
+      throw new InvalidSecurityEventCursorError();
+    }
+
+    return {
+      createdAt,
+      id: decoded.id as SecurityEventCursor["id"]
+    };
+  } catch (error) {
+    if (error instanceof InvalidSecurityEventCursorError) {
+      throw error;
+    }
+
+    throw new InvalidSecurityEventCursorError();
+  }
+}
+
 export class DefaultSecurityEventService implements SecurityEventService {
   constructor(
     private readonly store: Pick<IdentityStore, "createSecurityEvent" | "listSecurityEventsForUser">
@@ -85,13 +141,22 @@ export class DefaultSecurityEventService implements SecurityEventService {
     });
   }
 
-  async listForUser(userId: UserId, input: ListSecurityEventsInput = {}): Promise<SecurityEvent[]> {
-    return this.store.listSecurityEventsForUser({
+  async listForUser(
+    userId: UserId,
+    input: ListSecurityEventsInput = {}
+  ): Promise<ListSecurityEventsPage> {
+    const page = await this.store.listSecurityEventsForUser({
       userId,
+      cursor: decodeCursor(input.cursor),
       eventTypes: input.eventTypes?.length ? input.eventTypes : undefined,
       outcomes: input.outcomes?.length ? input.outcomes : undefined,
       riskLevels: input.riskLevels?.length ? input.riskLevels : undefined,
       limit: normalizeLimit(input.limit)
     });
+
+    return {
+      events: page.events,
+      ...(page.nextCursor ? { nextCursor: encodeCursor(page.nextCursor) } : {})
+    };
   }
 }
