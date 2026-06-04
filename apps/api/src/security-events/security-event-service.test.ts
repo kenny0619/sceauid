@@ -102,6 +102,8 @@ describe("DefaultSecurityEventService", () => {
 
     await service.listForUser(userId, {
       eventTypes: ["login_failed", "session_revoked"],
+      outcomes: ["failure"],
+      riskLevels: ["medium", "high"],
       limit: 25
     });
 
@@ -109,6 +111,8 @@ describe("DefaultSecurityEventService", () => {
       {
         userId,
         eventTypes: ["login_failed", "session_revoked"],
+        outcomes: ["failure"],
+        riskLevels: ["medium", "high"],
         limit: 25
       }
     ]);

@@ -147,4 +147,51 @@ describe("PostgresIdentityStore security events", () => {
 
     expect(events.map((event) => event.eventType)).toEqual(["login_failed"]);
   });
+
+  it("filters listed security events by outcome and risk level", async () => {
+    const user = await createTestUser(context);
+
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_failed",
+      outcome: "failure",
+      riskLevel: "medium",
+      metadata: {},
+      context: {}
+    });
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "suspicious_activity_flagged",
+      outcome: "pending",
+      riskLevel: "high",
+      metadata: {},
+      context: {}
+    });
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_succeeded",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: {},
+      context: {}
+    });
+
+    const events = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      outcomes: ["failure", "pending"],
+      riskLevels: ["medium", "high"],
+      limit: 10
+    });
+
+    expect(events.map((event) => event.eventType).sort()).toEqual([
+      "login_failed",
+      "suspicious_activity_flagged"
+    ]);
+  });
 });
