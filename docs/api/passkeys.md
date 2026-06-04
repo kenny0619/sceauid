@@ -295,11 +295,16 @@ Response:
 
 ```json
 {
-  "ok": true
+  "ok": true,
+  "recoveryRequest": {
+    "id": "recovery_request_123",
+    "expiresAt": "2026-06-01T12:15:00.000Z",
+    "riskLevel": "medium"
+  }
 }
 ```
 
-Redemption does not require an active session. The API normalizes and hashes the submitted code, then atomically marks a matching unused code as used. Invalid, already used, or unknown user/code pairs return `401` with `error: "invalid_recovery_code"`.
+Redemption does not require an active session. The API normalizes and hashes the submitted code, atomically marks a matching unused code as used, and creates a short-lived pending recovery request. Invalid, already used, or unknown user/code pairs return `401` with `error: "invalid_recovery_code"`.
 
 ## Session List
 
