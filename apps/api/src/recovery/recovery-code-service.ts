@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { SessionId, UserId } from "../domain/identity.js";
+import type { RecoveryRequestId, SessionId, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 
@@ -32,16 +32,23 @@ export type RedeemRecoveryCodeInput = {
 
 export type RedeemRecoveryCodeResult = {
   ok: true;
+  recoveryRequest: {
+    id: RecoveryRequestId;
+    expiresAt: Date;
+    riskLevel: "medium";
+  };
 };
 
 export type RecoveryCodeServiceOptions = {
   codeCount?: number;
   now?: () => Date;
   randomBytes?: (size: number) => Buffer;
+  recoveryRequestTtlSeconds?: number;
   securityEvents?: SecurityEventService;
 };
 
 const defaultCodeCount = 10;
+const defaultRecoveryRequestTtlSeconds = 60 * 15;
 const codeByteLength = 10;
 
 function formatRecoveryCode(bytes: Buffer): string {
@@ -63,6 +70,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   private readonly codeCount: number;
   private readonly now: () => Date;
   private readonly randomBytes: (size: number) => Buffer;
+  private readonly recoveryRequestTtlSeconds: number;
   private readonly securityEvents: SecurityEventService | undefined;
 
   constructor(
@@ -70,6 +78,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       IdentityStore,
       | "consumeRecoveryCode"
       | "countUnusedRecoveryCodesForUser"
+      | "createRecoveryRequest"
       | "createRecoveryCode"
       | "markUnusedRecoveryCodesUsed"
     >,
@@ -78,6 +87,8 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     this.codeCount = options.codeCount ?? defaultCodeCount;
     this.now = options.now ?? (() => new Date());
     this.randomBytes = options.randomBytes ?? randomBytes;
+    this.recoveryRequestTtlSeconds =
+      options.recoveryRequestTtlSeconds ?? defaultRecoveryRequestTtlSeconds;
     this.securityEvents = options.securityEvents;
   }
 
@@ -127,6 +138,12 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       throw new Error("Recovery code was invalid or already used");
     }
 
+    const recoveryRequest = await this.store.createRecoveryRequest({
+      userId: input.userId,
+      riskLevel: "medium",
+      expiresAt: new Date(redeemedAt.getTime() + this.recoveryRequestTtlSeconds * 1000)
+    });
+
     await this.recordSecurityEvent({
       userId: input.userId,
       actorUserId: input.userId,
@@ -134,11 +151,19 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       outcome: "success",
       riskLevel: "medium",
       metadata: {
+        recoveryRequestId: recoveryRequest.id,
         redeemedAt: redeemedAt.toISOString()
       }
     });
 
-    return { ok: true };
+    return {
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequest.id,
+        expiresAt: recoveryRequest.expiresAt,
+        riskLevel: "medium"
+      }
+    };
   }
 
   async status(userId: UserId): Promise<RecoveryCodeStatus> {
