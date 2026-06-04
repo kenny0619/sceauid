@@ -187,6 +187,8 @@ export type ListedSecurityEvent = {
 
 export type ListSecurityEventsInput = {
   eventTypes?: string[];
+  outcomes?: Array<"failure" | "pending" | "success">;
+  riskLevels?: Array<"high" | "low" | "medium">;
   limit?: number;
 };
 
@@ -278,6 +280,14 @@ export class SceauIDClient {
 
     for (const eventType of input.eventTypes ?? []) {
       searchParams.append("eventType", eventType);
+    }
+
+    for (const outcome of input.outcomes ?? []) {
+      searchParams.append("outcome", outcome);
+    }
+
+    for (const riskLevel of input.riskLevels ?? []) {
+      searchParams.append("riskLevel", riskLevel);
     }
 
     const query = searchParams.toString();
