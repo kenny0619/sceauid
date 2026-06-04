@@ -154,6 +154,10 @@ export type CurrentSessionResponse = {
   };
 };
 
+export type LogoutResponse = {
+  ok: true;
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -197,6 +201,12 @@ export class SceauIDClient {
 
   async currentSession(): Promise<CurrentSessionResponse> {
     return this.request("/v1/sessions/current");
+  }
+
+  async logout(): Promise<LogoutResponse> {
+    return this.request("/v1/sessions/current", {
+      method: "DELETE"
+    });
   }
 
   async meta(): Promise<unknown> {
