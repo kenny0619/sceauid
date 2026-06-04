@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import type { PasskeyCredential } from "../domain/identity.js";
+import type { PasskeyCredential, SessionId, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import type { SessionService } from "../sessions/session-service.js";
 
 export type PasskeyManagementRoutesDependencies = {
+  securityEvents?: Pick<SecurityEventService, "record">;
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
   store: Pick<IdentityStore, "listPasskeysForUser" | "revokePasskeyCredential">;
@@ -13,6 +15,32 @@ export type PasskeyManagementRoutesDependencies = {
 type PasskeyRouteParams = {
   passkeyId: string;
 };
+
+async function recordPasskeyRemoved(
+  securityEvents: Pick<SecurityEventService, "record"> | undefined,
+  input: {
+    actorSessionId: SessionId;
+    actorUserId: UserId;
+    passkey: PasskeyCredential;
+    revokedAt: Date;
+  }
+): Promise<void> {
+  await securityEvents
+    ?.record({
+      userId: input.passkey.userId,
+      actorUserId: input.actorUserId,
+      sessionId: input.actorSessionId,
+      eventType: "passkey_removed",
+      outcome: "success",
+      metadata: {
+        actorSessionId: input.actorSessionId,
+        deviceName: input.passkey.deviceName,
+        passkeyId: input.passkey.id,
+        revokedAt: input.revokedAt.toISOString()
+      }
+    })
+    .catch(() => undefined);
+}
 
 function serializePasskey(credential: PasskeyCredential) {
   return {
@@ -87,7 +115,15 @@ export async function registerPasskeyManagementRoutes(
       });
     }
 
-    await dependencies.store.revokePasskeyCredential(passkey.credentialId, now());
+    const revokedAt = now();
+
+    await dependencies.store.revokePasskeyCredential(passkey.credentialId, revokedAt);
+    await recordPasskeyRemoved(dependencies.securityEvents, {
+      actorSessionId: session.id,
+      actorUserId: session.userId,
+      passkey,
+      revokedAt
+    });
 
     return reply.send({
       ok: true
