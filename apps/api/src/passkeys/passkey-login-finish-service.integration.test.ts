@@ -121,7 +121,9 @@ describe("DefaultPasskeyLoginFinishService integration", () => {
         token: "session-token"
       }
     });
-    await expect(context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })).resolves.toMatchObject([
+    await expect(
+      context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
+    ).resolves.toMatchObject([
       {
         userId: user.id,
         sessionId: result.session.session.id,

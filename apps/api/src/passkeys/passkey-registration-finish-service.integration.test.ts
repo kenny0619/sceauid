@@ -91,7 +91,9 @@ describe("DefaultPasskeyRegistrationFinishService integration", () => {
     await expect(
       challengeStore.consumeChallenge("registration-id", "passkey_registration")
     ).resolves.toBeNull();
-    await expect(context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })).resolves.toMatchObject([
+    await expect(
+      context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
+    ).resolves.toMatchObject([
       {
         userId: user.id,
         eventType: "passkey_registered",

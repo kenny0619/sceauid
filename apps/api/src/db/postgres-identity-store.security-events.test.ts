@@ -110,9 +110,9 @@ describe("PostgresIdentityStore security events", () => {
       context: {}
     });
 
-    await expect(context.store.listSecurityEventsForUser({ userId: user.id, limit: 1 })).resolves.toHaveLength(
-      1
-    );
+    await expect(
+      context.store.listSecurityEventsForUser({ userId: user.id, limit: 1 })
+    ).resolves.toHaveLength(1);
   });
 
   it("filters listed security events by type", async () => {

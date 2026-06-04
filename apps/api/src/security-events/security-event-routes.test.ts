@@ -9,8 +9,8 @@ import type {
   SessionId,
   UserId
 } from "../domain/identity.js";
-import type { ListSecurityEventsInput } from "./security-event-service.js";
 import { registerSecurityEventRoutes } from "./security-event-routes.js";
+import type { ListSecurityEventsInput } from "./security-event-service.js";
 
 const userId = "user-id" as UserId;
 const session: Session = {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SecurityEvent, SecurityEventId, UserId } from "../domain/identity.js";
-import type { CreateSecurityEventInput, IdentityStore, SecurityEventFilter } from "../domain/storage.js";
+import type {
+  CreateSecurityEventInput,
+  IdentityStore,
+  SecurityEventFilter
+} from "../domain/storage.js";
 import { DefaultSecurityEventService } from "./security-event-service.js";
 
 function createFakeStore() {
