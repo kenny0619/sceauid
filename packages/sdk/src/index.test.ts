@@ -106,6 +106,44 @@ describe("SceauIDClient", () => {
     });
   });
 
+  it("fetches the current session with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      user: {
+        id: "user_123",
+        displayName: "Test User",
+        status: "active"
+      },
+      session: {
+        id: "session_123",
+        deviceLabel: "Safari on macOS",
+        userAgent: "test-agent",
+        expiresAt: "2026-07-04T12:00:00.000Z",
+        createdAt: "2026-06-04T12:00:00.000Z"
+      }
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.currentSession();
+
+    expect(result.user.id).toBe("user_123");
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/sessions/current"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {

@@ -139,6 +139,21 @@ export type PasskeyLoginFinishResponse = {
   };
 };
 
+export type CurrentSessionResponse = {
+  user: {
+    id: string;
+    displayName: string | null;
+    status: "active" | "disabled" | "pending_recovery";
+  };
+  session: {
+    id: string;
+    deviceLabel: string | null;
+    userAgent: string | null;
+    expiresAt: string;
+    createdAt: string;
+  };
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -178,6 +193,10 @@ export class SceauIDClient {
       body: input,
       method: "POST"
     });
+  }
+
+  async currentSession(): Promise<CurrentSessionResponse> {
+    return this.request("/v1/sessions/current");
   }
 
   async meta(): Promise<unknown> {
