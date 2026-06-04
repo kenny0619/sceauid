@@ -441,7 +441,14 @@ describe("SceauIDClient", () => {
   });
 
   it("redeems a recovery code", async () => {
-    const { calls, fetch } = createFetchStub({ ok: true });
+    const { calls, fetch } = createFetchStub({
+      ok: true,
+      recoveryRequest: {
+        id: "recovery_request_123",
+        expiresAt: "2026-06-01T12:15:00.000Z",
+        riskLevel: "medium"
+      }
+    });
     const client = new SceauIDClient({
       baseUrl: "https://identity.example.com",
       fetch
@@ -452,7 +459,14 @@ describe("SceauIDClient", () => {
       userId: "user_123"
     });
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: "recovery_request_123",
+        expiresAt: "2026-06-01T12:15:00.000Z",
+        riskLevel: "medium"
+      }
+    });
     expect(calls).toEqual([
       {
         init: {

@@ -1,10 +1,11 @@
 import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
-import type { Session, SessionId, UserId } from "../domain/identity.js";
+import type { RecoveryRequestId, Session, SessionId, UserId } from "../domain/identity.js";
 import { registerRecoveryRoutes } from "./recovery-routes.js";
 
 const userId = "user-id" as UserId;
+const recoveryRequestId = "recovery-request-id" as RecoveryRequestId;
 const session: Session = {
   id: "session-id" as SessionId,
   userId,
@@ -43,7 +44,14 @@ function createApp(
           throw new Error("Recovery code was invalid or already used");
         }
 
-        return { ok: true };
+        return {
+          ok: true,
+          recoveryRequest: {
+            id: recoveryRequestId,
+            expiresAt: new Date("2026-06-01T12:15:00.000Z"),
+            riskLevel: "medium"
+          }
+        };
       },
       async status(statusUserId) {
         statusUsers.push(statusUserId);
@@ -129,7 +137,14 @@ describe("recovery routes", () => {
         userId
       }
     ]);
-    expect(response.json()).toEqual({ ok: true });
+    expect(response.json()).toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequestId,
+        expiresAt: "2026-06-01T12:15:00.000Z",
+        riskLevel: "medium"
+      }
+    });
   });
 
   it("rejects invalid recovery code redemption payloads", async () => {

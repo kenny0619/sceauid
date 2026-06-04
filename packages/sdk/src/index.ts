@@ -230,6 +230,15 @@ export type RedeemRecoveryCodeInput = {
   userId: string;
 };
 
+export type RedeemRecoveryCodeResponse = {
+  ok: true;
+  recoveryRequest: {
+    id: string;
+    expiresAt: string;
+    riskLevel: "medium";
+  };
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -343,7 +352,7 @@ export class SceauIDClient {
     });
   }
 
-  async redeemRecoveryCode(input: RedeemRecoveryCodeInput): Promise<LogoutResponse> {
+  async redeemRecoveryCode(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResponse> {
     return this.request("/v1/recovery/codes/redeem", {
       body: input,
       method: "POST"
