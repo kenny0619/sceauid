@@ -86,7 +86,7 @@ export type IdentityStore = {
   completeRecoveryRequest(userId: UserId, completedAt: Date): Promise<void>;
 
   createSecurityEvent(input: CreateSecurityEventInput): Promise<SecurityEvent>;
-  listSecurityEventsForUser(userId: UserId, limit: number): Promise<SecurityEvent[]>;
+  listSecurityEventsForUser(filter: SecurityEventFilter): Promise<SecurityEvent[]>;
 };
 
 export type ChallengePurpose = "passkey_registration" | "passkey_login" | "email_recovery";

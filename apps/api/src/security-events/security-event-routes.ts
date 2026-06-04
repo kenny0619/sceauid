@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { SecurityEvent } from "../domain/identity.js";
+import type { SecurityEvent, SecurityEventType } from "../domain/identity.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { SecurityEventService } from "./security-event-service.js";
 
@@ -10,7 +10,45 @@ export type SecurityEventRoutesDependencies = {
   sessionService: Pick<SessionService, "authenticate">;
 };
 
+const securityEventTypes = [
+  "signup_started",
+  "email_verified",
+  "passkey_registration_started",
+  "passkey_registered",
+  "passkey_registration_failed",
+  "passkey_removed",
+  "login_started",
+  "login_succeeded",
+  "login_failed",
+  "session_created",
+  "session_revoked",
+  "recovery_started",
+  "recovery_verified",
+  "recovery_completed",
+  "recovery_delayed",
+  "rate_limit_triggered",
+  "suspicious_activity_flagged"
+] as const satisfies readonly SecurityEventType[];
+
+const eventTypeQuerySchema = z.preprocess((value) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const values = Array.isArray(value) ? value : [value];
+
+  return values.flatMap((entry) =>
+    typeof entry === "string"
+      ? entry
+          .split(",")
+          .map((eventType) => eventType.trim())
+          .filter(Boolean)
+      : [entry]
+  );
+}, z.array(z.enum(securityEventTypes)).optional());
+
 const listSecurityEventsQuerySchema = z.object({
+  eventType: eventTypeQuerySchema,
   limit: z.coerce.number().int().positive().max(100).optional()
 });
 
@@ -61,7 +99,10 @@ export async function registerSecurityEventRoutes(
       });
     }
 
-    const events = await dependencies.securityEvents.listForUser(session.userId, query.data.limit);
+    const events = await dependencies.securityEvents.listForUser(session.userId, {
+      eventTypes: query.data.eventType,
+      limit: query.data.limit
+    });
 
     return reply.send({
       events: events.map(serializeSecurityEvent)
