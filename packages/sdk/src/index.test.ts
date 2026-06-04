@@ -440,6 +440,38 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("redeems a recovery code", async () => {
+    const { calls, fetch } = createFetchStub({ ok: true });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.redeemRecoveryCode({
+      code: "ABCDE-FGHIJ-KLMNO-PQRST",
+      userId: "user_123"
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([
+      {
+        init: {
+          body: JSON.stringify({
+            code: "ABCDE-FGHIJ-KLMNO-PQRST",
+            userId: "user_123"
+          }),
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        },
+        url: "https://identity.example.com/v1/recovery/codes/redeem"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {
