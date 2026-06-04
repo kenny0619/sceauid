@@ -98,6 +98,7 @@ await registerPasskeyRoutes(app, {
   }
 });
 await registerPasskeyManagementRoutes(app, {
+  securityEvents,
   sessionCookieName: config.SESSION_COOKIE_NAME,
   sessionService,
   store: identityStore
