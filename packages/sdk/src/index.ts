@@ -225,6 +225,11 @@ export type EnrollRecoveryCodesResponse = RecoveryCodeStatusResponse & {
   codes: string[];
 };
 
+export type RedeemRecoveryCodeInput = {
+  code: string;
+  userId: string;
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -334,6 +339,13 @@ export class SceauIDClient {
 
   async enrollRecoveryCodes(): Promise<EnrollRecoveryCodesResponse> {
     return this.request("/v1/recovery/codes", {
+      method: "POST"
+    });
+  }
+
+  async redeemRecoveryCode(input: RedeemRecoveryCodeInput): Promise<LogoutResponse> {
+    return this.request("/v1/recovery/codes/redeem", {
+      body: input,
       method: "POST"
     });
   }

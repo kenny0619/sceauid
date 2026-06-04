@@ -17,8 +17,11 @@ const session: Session = {
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
-function createApp(options: { authenticatedSession?: Session | null } = {}) {
+function createApp(
+  options: { authenticatedSession?: Session | null; rejectRedemption?: boolean } = {}
+) {
   const enrolledUsers: UserId[] = [];
+  const redeemedCodes: Array<{ code: string; userId: UserId }> = [];
   const statusUsers: UserId[] = [];
   const app = Fastify();
 
@@ -32,6 +35,15 @@ function createApp(options: { authenticatedSession?: Session | null } = {}) {
           recoveryCodesConfigured: true,
           unusedRecoveryCodeCount: 1
         };
+      },
+      async redeem(input) {
+        redeemedCodes.push(input);
+
+        if (options.rejectRedemption) {
+          throw new Error("Recovery code was invalid or already used");
+        }
+
+        return { ok: true };
       },
       async status(statusUserId) {
         statusUsers.push(statusUserId);
@@ -50,7 +62,7 @@ function createApp(options: { authenticatedSession?: Session | null } = {}) {
     }
   });
 
-  return { app, enrolledUsers, statusUsers };
+  return { app, enrolledUsers, redeemedCodes, statusUsers };
 }
 
 describe("recovery routes", () => {
@@ -90,6 +102,65 @@ describe("recovery routes", () => {
       codes: ["AAAAA-BBBBB-CCCCC-DDDDD"],
       recoveryCodesConfigured: true,
       unusedRecoveryCodeCount: 1
+    });
+  });
+
+  it("redeems a recovery code without requiring a session", async () => {
+    const { app, redeemedCodes } = createApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/codes/redeem",
+      payload: {
+        code: "AAAAA-BBBBB-CCCCC-DDDDD",
+        userId
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(redeemedCodes).toEqual([
+      {
+        code: "AAAAA-BBBBB-CCCCC-DDDDD",
+        userId
+      }
+    ]);
+    expect(response.json()).toEqual({ ok: true });
+  });
+
+  it("rejects invalid recovery code redemption payloads", async () => {
+    const { app } = createApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/codes/redeem",
+      payload: {
+        code: ""
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_request",
+      message: "Recovery code redemption request is invalid"
+    });
+  });
+
+  it("returns a generic error for invalid or used recovery codes", async () => {
+    const { app } = createApp({ rejectRedemption: true });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/codes/redeem",
+      payload: {
+        code: "AAAAA-BBBBB-CCCCC-DDDDD",
+        userId
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "invalid_recovery_code",
+      message: "Recovery code is invalid or already used"
     });
   });
 

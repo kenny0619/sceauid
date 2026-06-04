@@ -10,13 +10,22 @@ import {
 const userId = "user-id" as UserId;
 
 function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
+  const consumedCodes: Array<{ codeHash: string; usedAt: Date; userId: UserId }> = [];
   const createdCodes: CreateRecoveryCodeInput[] = [];
   const markedUsed: Array<{ userId: UserId; usedAt: Date }> = [];
+  let consumeRecoveryCodeResult = true;
 
   const store: Pick<
     IdentityStore,
-    "countUnusedRecoveryCodesForUser" | "createRecoveryCode" | "markUnusedRecoveryCodesUsed"
+    | "consumeRecoveryCode"
+    | "countUnusedRecoveryCodesForUser"
+    | "createRecoveryCode"
+    | "markUnusedRecoveryCodesUsed"
   > = {
+    async consumeRecoveryCode(consumeUserId, codeHash, usedAt) {
+      consumedCodes.push({ codeHash, usedAt, userId: consumeUserId });
+      return consumeRecoveryCodeResult;
+    },
     async countUnusedRecoveryCodesForUser(statusUserId) {
       expect(statusUserId).toBe(userId);
       return options.unusedRecoveryCodeCount ?? 0;
@@ -30,7 +39,15 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     }
   };
 
-  return { createdCodes, markedUsed, store };
+  return {
+    consumedCodes,
+    createdCodes,
+    markRecoveryCodeInvalid() {
+      consumeRecoveryCodeResult = false;
+    },
+    markedUsed,
+    store
+  };
 }
 
 describe("DefaultRecoveryCodeService", () => {
@@ -80,5 +97,32 @@ describe("DefaultRecoveryCodeService", () => {
       recoveryCodesConfigured: true,
       unusedRecoveryCodeCount: 3
     });
+  });
+
+  it("redeems a recovery code using its normalized hash", async () => {
+    const { consumedCodes, store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, {
+      now: () => new Date("2026-06-01T12:00:00.000Z")
+    });
+
+    await expect(service.redeem({ code: "abcd-1234 ef", userId })).resolves.toEqual({ ok: true });
+
+    expect(consumedCodes).toEqual([
+      {
+        codeHash: hashRecoveryCode("ABCD1234EF"),
+        usedAt: new Date("2026-06-01T12:00:00.000Z"),
+        userId
+      }
+    ]);
+  });
+
+  it("rejects invalid or used recovery codes", async () => {
+    const { markRecoveryCodeInvalid, store } = createFakeStore();
+    markRecoveryCodeInvalid();
+    const service = new DefaultRecoveryCodeService(store);
+
+    await expect(service.redeem({ code: "invalid-code", userId })).rejects.toThrow(
+      "Recovery code was invalid or already used"
+    );
   });
 });

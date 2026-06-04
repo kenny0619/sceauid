@@ -4,6 +4,7 @@ import type { IdentityStore } from "../domain/storage.js";
 
 export type RecoveryCodeService = {
   enroll(input: EnrollRecoveryCodesInput): Promise<EnrollRecoveryCodesResult>;
+  redeem(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResult>;
   status(userId: UserId): Promise<RecoveryCodeStatus>;
 };
 
@@ -20,6 +21,15 @@ export type EnrollRecoveryCodesResult = {
 export type RecoveryCodeStatus = {
   recoveryCodesConfigured: boolean;
   unusedRecoveryCodeCount: number;
+};
+
+export type RedeemRecoveryCodeInput = {
+  code: string;
+  userId: UserId;
+};
+
+export type RedeemRecoveryCodeResult = {
+  ok: true;
 };
 
 export type RecoveryCodeServiceOptions = {
@@ -54,7 +64,10 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   constructor(
     private readonly store: Pick<
       IdentityStore,
-      "countUnusedRecoveryCodesForUser" | "createRecoveryCode" | "markUnusedRecoveryCodesUsed"
+      | "consumeRecoveryCode"
+      | "countUnusedRecoveryCodesForUser"
+      | "createRecoveryCode"
+      | "markUnusedRecoveryCodesUsed"
     >,
     options: RecoveryCodeServiceOptions = {}
   ) {
@@ -82,6 +95,20 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       recoveryCodesConfigured: true,
       unusedRecoveryCodeCount: codes.length
     };
+  }
+
+  async redeem(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResult> {
+    const consumed = await this.store.consumeRecoveryCode(
+      input.userId,
+      hashRecoveryCode(input.code),
+      this.now()
+    );
+
+    if (!consumed) {
+      throw new Error("Recovery code was invalid or already used");
+    }
+
+    return { ok: true };
   }
 
   async status(userId: UserId): Promise<RecoveryCodeStatus> {

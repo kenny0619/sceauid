@@ -63,6 +63,24 @@ describe("PostgresIdentityStore recovery", () => {
     await expect(context.store.findUnusedRecoveryCode(user.id, "code-hash-1")).resolves.toBeNull();
   });
 
+  it("consumes an unused recovery code once", async () => {
+    const user = await createTestUser(context);
+    const usedAt = new Date("2026-06-01T12:00:00.000Z");
+
+    await context.store.createRecoveryCode({
+      userId: user.id,
+      codeHash: "code-hash"
+    });
+
+    await expect(context.store.consumeRecoveryCode(user.id, "code-hash", usedAt)).resolves.toBe(
+      true
+    );
+    await expect(context.store.consumeRecoveryCode(user.id, "code-hash", usedAt)).resolves.toBe(
+      false
+    );
+    await expect(context.store.findUnusedRecoveryCode(user.id, "code-hash")).resolves.toBeNull();
+  });
+
   it("finds active pending recovery requests by user and expiry", async () => {
     const user = await createTestUser(context);
     const now = new Date("2026-06-01T12:00:00.000Z");

@@ -280,6 +280,27 @@ Response:
 
 Enrollment returns the plain recovery codes once. Existing unused recovery codes for the user are invalidated before the new set is stored. SceauID stores code hashes only, so product applications should ask users to copy or download the returned codes immediately.
 
+### Redeem Recovery Code
+
+`POST /v1/recovery/codes/redeem`
+
+```json
+{
+  "userId": "user_123",
+  "code": "ABCDE-FGHIJ-KLMNO-PQRST"
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+Redemption does not require an active session. The API normalizes and hashes the submitted code, then atomically marks a matching unused code as used. Invalid, already used, or unknown user/code pairs return `401` with `error: "invalid_recovery_code"`.
+
 ## Session List
 
 `GET /v1/sessions`
@@ -369,6 +390,7 @@ Current passkey route error codes:
 - `login_start_failed`
 - `login_finish_failed`
 - `unauthenticated`
+- `invalid_recovery_code`
 - `security_event_not_found`
 
 ## Security Events
