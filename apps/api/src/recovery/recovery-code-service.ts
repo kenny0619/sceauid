@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { UserId } from "../domain/identity.js";
+import type { SessionId, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 
 export type RecoveryCodeService = {
   enroll(input: EnrollRecoveryCodesInput): Promise<EnrollRecoveryCodesResult>;
@@ -9,6 +10,7 @@ export type RecoveryCodeService = {
 };
 
 export type EnrollRecoveryCodesInput = {
+  actorSessionId?: SessionId | null;
   userId: UserId;
 };
 
@@ -36,6 +38,7 @@ export type RecoveryCodeServiceOptions = {
   codeCount?: number;
   now?: () => Date;
   randomBytes?: (size: number) => Buffer;
+  securityEvents?: SecurityEventService;
 };
 
 const defaultCodeCount = 10;
@@ -60,6 +63,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   private readonly codeCount: number;
   private readonly now: () => Date;
   private readonly randomBytes: (size: number) => Buffer;
+  private readonly securityEvents: SecurityEventService | undefined;
 
   constructor(
     private readonly store: Pick<
@@ -74,10 +78,12 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     this.codeCount = options.codeCount ?? defaultCodeCount;
     this.now = options.now ?? (() => new Date());
     this.randomBytes = options.randomBytes ?? randomBytes;
+    this.securityEvents = options.securityEvents;
   }
 
   async enroll(input: EnrollRecoveryCodesInput): Promise<EnrollRecoveryCodesResult> {
-    await this.store.markUnusedRecoveryCodesUsed(input.userId, this.now());
+    const enrolledAt = this.now();
+    await this.store.markUnusedRecoveryCodesUsed(input.userId, enrolledAt);
 
     const codes = Array.from({ length: this.codeCount }, () =>
       formatRecoveryCode(this.randomBytes(codeByteLength))
@@ -90,6 +96,18 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       });
     }
 
+    await this.recordSecurityEvent({
+      userId: input.userId,
+      actorUserId: input.userId,
+      sessionId: input.actorSessionId ?? null,
+      eventType: "recovery_codes_enrolled",
+      outcome: "success",
+      metadata: {
+        codeCount: codes.length,
+        enrolledAt: enrolledAt.toISOString()
+      }
+    });
+
     return {
       codes,
       recoveryCodesConfigured: true,
@@ -98,15 +116,27 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   }
 
   async redeem(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResult> {
+    const redeemedAt = this.now();
     const consumed = await this.store.consumeRecoveryCode(
       input.userId,
       hashRecoveryCode(input.code),
-      this.now()
+      redeemedAt
     );
 
     if (!consumed) {
       throw new Error("Recovery code was invalid or already used");
     }
+
+    await this.recordSecurityEvent({
+      userId: input.userId,
+      actorUserId: input.userId,
+      eventType: "recovery_code_redeemed",
+      outcome: "success",
+      riskLevel: "medium",
+      metadata: {
+        redeemedAt: redeemedAt.toISOString()
+      }
+    });
 
     return { ok: true };
   }
@@ -118,5 +148,11 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       recoveryCodesConfigured: unusedRecoveryCodeCount > 0,
       unusedRecoveryCodeCount
     };
+  }
+
+  private async recordSecurityEvent(
+    input: Parameters<SecurityEventService["record"]>[0]
+  ): Promise<void> {
+    await this.securityEvents?.record(input).catch(() => undefined);
   }
 }
