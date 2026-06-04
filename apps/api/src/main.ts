@@ -10,6 +10,7 @@ import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-
 import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-registration-finish-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
+import { registerSecurityEventRoutes } from "./security-events/security-event-routes.js";
 import { DefaultSecurityEventService } from "./security-events/security-event-service.js";
 import { registerSessionRoutes } from "./sessions/session-routes.js";
 import { DefaultSessionService } from "./sessions/session-service.js";
@@ -104,6 +105,11 @@ await registerSessionRoutes(app, {
   },
   sessionService,
   store: identityStore
+});
+await registerSecurityEventRoutes(app, {
+  securityEvents,
+  sessionCookieName: config.SESSION_COOKIE_NAME,
+  sessionService
 });
 
 app.get("/health", async () => ({

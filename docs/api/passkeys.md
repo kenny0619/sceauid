@@ -305,6 +305,37 @@ Current events include:
 
 Session revocation events include metadata for `reason`, `actorSessionId`, and whether the revoked session was the actor's own session.
 
+### List Security Events
+
+`GET /v1/security-events?limit=50`
+
+Authenticated clients can fetch the current user's security timeline.
+
+Response:
+
+```json
+{
+  "events": [
+    {
+      "id": "event_123",
+      "userId": "user_123",
+      "actorUserId": "user_123",
+      "sessionId": "session_123",
+      "eventType": "session_revoked",
+      "outcome": "success",
+      "riskLevel": "low",
+      "metadata": {
+        "reason": "targeted_revoke"
+      },
+      "context": {},
+      "createdAt": "2026-06-04T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+`limit` is optional and must be between `1` and `100`.
+
 These events are intended to support account timelines, user-facing security history, investigation workflows, and future webhook delivery.
 
 ## Integration Notes
