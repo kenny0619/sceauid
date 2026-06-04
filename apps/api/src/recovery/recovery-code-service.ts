@@ -1,11 +1,18 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { RecoveryRequestId, SessionId, UserId } from "../domain/identity.js";
+import type {
+  RecoveryRequest,
+  RecoveryRequestId,
+  RecoveryRequestStatus,
+  SessionId,
+  UserId
+} from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 
 export type RecoveryCodeService = {
   enroll(input: EnrollRecoveryCodesInput): Promise<EnrollRecoveryCodesResult>;
   redeem(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResult>;
+  recoveryRequestStatus(recoveryRequestId: RecoveryRequestId): Promise<RecoveryRequestStatusResult>;
   status(userId: UserId): Promise<RecoveryCodeStatus>;
 };
 
@@ -36,6 +43,16 @@ export type RedeemRecoveryCodeResult = {
     id: RecoveryRequestId;
     expiresAt: Date;
     riskLevel: "medium";
+  };
+};
+
+export type RecoveryRequestStatusResult = {
+  recoveryRequest: {
+    id: RecoveryRequestId;
+    active: boolean;
+    expiresAt: Date;
+    riskLevel: RecoveryRequest["riskLevel"];
+    status: RecoveryRequestStatus;
   };
 };
 
@@ -80,6 +97,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       | "countUnusedRecoveryCodesForUser"
       | "createRecoveryRequest"
       | "createRecoveryCode"
+      | "findRecoveryRequestById"
       | "markUnusedRecoveryCodesUsed"
     >,
     options: RecoveryCodeServiceOptions = {}
@@ -162,6 +180,31 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
         id: recoveryRequest.id,
         expiresAt: recoveryRequest.expiresAt,
         riskLevel: "medium"
+      }
+    };
+  }
+
+  async recoveryRequestStatus(
+    recoveryRequestId: RecoveryRequestId
+  ): Promise<RecoveryRequestStatusResult> {
+    const recoveryRequest = await this.store.findRecoveryRequestById(recoveryRequestId);
+
+    if (!recoveryRequest) {
+      throw new Error("Recovery request was not found");
+    }
+
+    const status =
+      recoveryRequest.status === "pending" && recoveryRequest.expiresAt <= this.now()
+        ? "expired"
+        : recoveryRequest.status;
+
+    return {
+      recoveryRequest: {
+        id: recoveryRequest.id,
+        active: status === "pending",
+        expiresAt: recoveryRequest.expiresAt,
+        riskLevel: recoveryRequest.riskLevel,
+        status
       }
     };
   }
