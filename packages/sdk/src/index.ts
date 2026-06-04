@@ -154,6 +154,20 @@ export type CurrentSessionResponse = {
   };
 };
 
+export type ListedSession = {
+  id: string;
+  current: boolean;
+  deviceLabel: string | null;
+  userAgent: string | null;
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
+};
+
+export type ListSessionsResponse = {
+  sessions: ListedSession[];
+};
+
 export type LogoutResponse = {
   ok: true;
 };
@@ -201,6 +215,10 @@ export class SceauIDClient {
 
   async currentSession(): Promise<CurrentSessionResponse> {
     return this.request("/v1/sessions/current");
+  }
+
+  async sessions(): Promise<ListSessionsResponse> {
+    return this.request("/v1/sessions");
   }
 
   async logout(): Promise<LogoutResponse> {

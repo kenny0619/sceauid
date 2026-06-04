@@ -144,6 +144,43 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("lists sessions with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      sessions: [
+        {
+          id: "session_123",
+          current: true,
+          deviceLabel: "Safari on macOS",
+          userAgent: "test-agent",
+          expiresAt: "2026-07-04T12:00:00.000Z",
+          revokedAt: null,
+          createdAt: "2026-06-04T12:00:00.000Z"
+        }
+      ]
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.sessions();
+
+    expect(result.sessions).toHaveLength(1);
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/sessions"
+      }
+    ]);
+  });
+
   it("logs out the current session with credentials", async () => {
     const { calls, fetch } = createFetchStub({ ok: true });
     const client = new SceauIDClient({
