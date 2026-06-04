@@ -81,7 +81,9 @@ export type IdentityStore = {
   revokeUserSessions(userId: UserId, revokedAt: Date): Promise<void>;
 
   createRecoveryCode(input: CreateRecoveryCodeInput): Promise<RecoveryCode>;
+  countUnusedRecoveryCodesForUser(userId: UserId): Promise<number>;
   findUnusedRecoveryCode(userId: UserId, codeHash: string): Promise<RecoveryCode | null>;
+  markUnusedRecoveryCodesUsed(userId: UserId, usedAt: Date): Promise<void>;
   markRecoveryCodeUsed(userId: UserId, codeHash: string, usedAt: Date): Promise<void>;
 
   createRecoveryRequest(input: CreateRecoveryRequestInput): Promise<RecoveryRequest>;

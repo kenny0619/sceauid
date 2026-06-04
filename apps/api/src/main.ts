@@ -11,6 +11,8 @@ import { registerPasskeyManagementRoutes } from "./passkeys/passkey-management-r
 import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-registration-finish-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
+import { DefaultRecoveryCodeService } from "./recovery/recovery-code-service.js";
+import { registerRecoveryRoutes } from "./recovery/recovery-routes.js";
 import { registerSecurityEventRoutes } from "./security-events/security-event-routes.js";
 import { DefaultSecurityEventService } from "./security-events/security-event-service.js";
 import { registerSessionRoutes } from "./sessions/session-routes.js";
@@ -22,6 +24,7 @@ const identityStore = new PostgresIdentityStore(databaseClient.db);
 const challengeStore = await createRedisChallengeStore(config.REDIS_URL);
 const sessionService = new DefaultSessionService(identityStore);
 const securityEvents = new DefaultSecurityEventService(identityStore);
+const recoveryCodes = new DefaultRecoveryCodeService(identityStore);
 const loginStartService = new DefaultPasskeyLoginStartService(
   identityStore,
   challengeStore.store,
@@ -112,6 +115,11 @@ await registerSessionRoutes(app, {
   },
   sessionService,
   store: identityStore
+});
+await registerRecoveryRoutes(app, {
+  recoveryCodes,
+  sessionCookieName: config.SESSION_COOKIE_NAME,
+  sessionService
 });
 await registerSecurityEventRoutes(app, {
   securityEvents,

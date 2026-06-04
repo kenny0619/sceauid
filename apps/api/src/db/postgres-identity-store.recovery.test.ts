@@ -34,6 +34,35 @@ describe("PostgresIdentityStore recovery", () => {
     await expect(context.store.findUnusedRecoveryCode(user.id, "code-hash")).resolves.toBeNull();
   });
 
+  it("counts and marks unused recovery codes for a user", async () => {
+    const user = await createTestUser(context);
+    const otherUser = await context.store.createUser({
+      displayName: "Other User"
+    });
+    const usedAt = new Date("2026-06-01T12:00:00.000Z");
+
+    await context.store.createRecoveryCode({
+      userId: user.id,
+      codeHash: "code-hash-1"
+    });
+    await context.store.createRecoveryCode({
+      userId: user.id,
+      codeHash: "code-hash-2"
+    });
+    await context.store.createRecoveryCode({
+      userId: otherUser.id,
+      codeHash: "other-code-hash"
+    });
+
+    await expect(context.store.countUnusedRecoveryCodesForUser(user.id)).resolves.toBe(2);
+
+    await context.store.markUnusedRecoveryCodesUsed(user.id, usedAt);
+
+    await expect(context.store.countUnusedRecoveryCodesForUser(user.id)).resolves.toBe(0);
+    await expect(context.store.countUnusedRecoveryCodesForUser(otherUser.id)).resolves.toBe(1);
+    await expect(context.store.findUnusedRecoveryCode(user.id, "code-hash-1")).resolves.toBeNull();
+  });
+
   it("finds active pending recovery requests by user and expiry", async () => {
     const user = await createTestUser(context);
     const now = new Date("2026-06-01T12:00:00.000Z");
