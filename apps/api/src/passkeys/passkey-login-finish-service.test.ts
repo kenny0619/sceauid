@@ -303,6 +303,25 @@ describe("DefaultPasskeyLoginFinishService", () => {
           ipHash: "ip-hash",
           userAgent: "test-agent"
         }
+      },
+      {
+        userId,
+        sessionId: "session-id",
+        eventType: "session_created",
+        outcome: "success",
+        metadata: {
+          credentialId: "credential-id",
+          deviceLabel: "MacBook",
+          expiresAt: "2026-07-01T12:00:00.000Z",
+          ipHashPresent: true,
+          loginId: "login-id",
+          passkeyId: "passkey-id",
+          userAgent: "test-agent"
+        },
+        context: {
+          ipHash: "ip-hash",
+          userAgent: "test-agent"
+        }
       }
     ]);
   });

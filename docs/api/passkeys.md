@@ -348,11 +348,14 @@ Current events include:
 - `login_succeeded`
 - `login_failed`
 - `passkey_removed`
+- `session_created`
 - `session_revoked`
 
 Passkey removal events include metadata for `passkeyId`, `deviceName`, `actorSessionId`, and `revokedAt`.
 
-Session revocation events include metadata for `reason`, `actorSessionId`, and whether the revoked session was the actor's own session.
+Session creation events include metadata for `loginId`, `credentialId`, `passkeyId`, `deviceLabel`, `userAgent`, `ipHashPresent`, and `expiresAt`.
+
+Session revocation events include metadata for `reason`, `actorSessionId`, whether the revoked session was the actor's own session, and target session device/timing fields.
 
 ### List Security Events
 

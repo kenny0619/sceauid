@@ -121,25 +121,44 @@ describe("DefaultPasskeyLoginFinishService integration", () => {
         token: "session-token"
       }
     });
-    await expect(
-      context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
-    ).resolves.toMatchObject({
-      events: [
-        {
-          userId: user.id,
-          sessionId: result.session.session.id,
+    const page = await context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 });
+
+    expect(page.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
           eventType: "login_succeeded",
           outcome: "success",
-          metadata: {
+          userId: user.id,
+          sessionId: result.session.session.id,
+          metadata: expect.objectContaining({
             credentialId: "credential-id",
             loginId: "login-id"
-          },
-          context: {
+          }),
+          context: expect.objectContaining({
             ipHash: "ip-hash",
             userAgent: "test-agent"
-          }
-        }
-      ]
-    });
+          })
+        }),
+        expect.objectContaining({
+          eventType: "session_created",
+          outcome: "success",
+          userId: user.id,
+          sessionId: result.session.session.id,
+          metadata: expect.objectContaining({
+            credentialId: "credential-id",
+            deviceLabel: "Safari on macOS",
+            expiresAt: "2026-07-01T12:00:00.000Z",
+            ipHashPresent: true,
+            loginId: "login-id",
+            passkeyId: expect.any(String),
+            userAgent: "test-agent"
+          }),
+          context: expect.objectContaining({
+            ipHash: "ip-hash",
+            userAgent: "test-agent"
+          })
+        })
+      ])
+    );
   });
 });

@@ -76,7 +76,11 @@ describe("session routes integration", () => {
       metadata: {
         actorSessionId: current.session.id,
         reason: "targeted_revoke",
-        self: false
+        self: false,
+        targetCreatedAt: other.session.createdAt.toISOString(),
+        targetDeviceLabel: other.session.deviceLabel,
+        targetExpiresAt: other.session.expiresAt.toISOString(),
+        targetUserAgent: other.session.userAgent
       }
     });
   });
