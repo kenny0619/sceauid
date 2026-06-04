@@ -16,6 +16,10 @@ export type SessionRoutesDependencies = {
   store: Pick<IdentityStore, "findUserById">;
 };
 
+type SessionRouteParams = {
+  sessionId: string;
+};
+
 function clearSessionCookie(
   reply: {
     clearCookie(
@@ -134,6 +138,46 @@ export async function registerSessionRoutes(
     }
 
     clearSessionCookie(reply, dependencies.sessionCookie);
+
+    return reply.send({
+      ok: true
+    });
+  });
+
+  app.delete<{ Params: SessionRouteParams }>("/v1/sessions/:sessionId", async (request, reply) => {
+    const token = request.cookies[dependencies.sessionCookie.name];
+
+    if (!token) {
+      return reply.status(401).send({
+        error: "unauthenticated",
+        message: "Session cookie was not found"
+      });
+    }
+
+    const currentSession = await dependencies.sessionService.authenticate(token);
+
+    if (!currentSession) {
+      return reply.status(401).send({
+        error: "unauthenticated",
+        message: "Session is invalid or expired"
+      });
+    }
+
+    const sessions = await dependencies.sessionService.listForUser(currentSession.userId);
+    const targetSession = sessions.find((session) => session.id === request.params.sessionId);
+
+    if (!targetSession) {
+      return reply.status(404).send({
+        error: "session_not_found",
+        message: "Session was not found"
+      });
+    }
+
+    await dependencies.sessionService.revoke(targetSession.id);
+
+    if (targetSession.id === currentSession.id) {
+      clearSessionCookie(reply, dependencies.sessionCookie);
+    }
 
     return reply.send({
       ok: true
