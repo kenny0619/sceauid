@@ -87,6 +87,31 @@ describe("PostgresIdentityStore security events", () => {
     expect(events.map((event) => event.eventType)).toEqual(["login_succeeded", "signup_started"]);
   });
 
+  it("finds a security event scoped by user", async () => {
+    const user = await createTestUser(context);
+    const otherUser = await context.store.createUser({ displayName: "Other User" });
+
+    const event = await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "session_revoked",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: {},
+      context: {}
+    });
+
+    await expect(context.store.findSecurityEventForUser(user.id, event.id)).resolves.toMatchObject({
+      id: event.id,
+      userId: user.id,
+      eventType: "session_revoked"
+    });
+    await expect(
+      context.store.findSecurityEventForUser(otherUser.id, event.id)
+    ).resolves.toBeNull();
+  });
+
   it("respects security event list limits", async () => {
     const user = await createTestUser(context);
 

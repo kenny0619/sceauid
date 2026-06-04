@@ -102,6 +102,9 @@ function createFakeGenerateOptions() {
 function createFakeSecurityEvents() {
   const records: Parameters<SecurityEventService["record"]>[0][] = [];
   const service: SecurityEventService = {
+    async findForUser() {
+      return null;
+    },
     async record(input) {
       records.push(input);
       return undefined as never;

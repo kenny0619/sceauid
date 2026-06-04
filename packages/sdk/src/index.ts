@@ -198,6 +198,10 @@ export type ListSecurityEventsResponse = {
   nextCursor: string | null;
 };
 
+export type SecurityEventResponse = {
+  event: ListedSecurityEvent;
+};
+
 export type ListedPasskey = {
   id: string;
   credentialId: string;
@@ -299,6 +303,10 @@ export class SceauIDClient {
     const query = searchParams.toString();
 
     return this.request(`/v1/security-events${query ? `?${query}` : ""}`);
+  }
+
+  async securityEvent(eventId: string): Promise<SecurityEventResponse> {
+    return this.request(`/v1/security-events/${encodeURIComponent(eventId)}`);
   }
 
   async passkeys(): Promise<ListPasskeysResponse> {

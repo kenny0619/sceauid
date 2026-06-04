@@ -3,6 +3,7 @@ import { z } from "zod";
 import type {
   RiskLevel,
   SecurityEvent,
+  SecurityEventId,
   SecurityEventOutcome,
   SecurityEventType
 } from "../domain/identity.js";
@@ -13,9 +14,13 @@ import {
 } from "./security-event-service.js";
 
 export type SecurityEventRoutesDependencies = {
-  securityEvents: Pick<SecurityEventService, "listForUser">;
+  securityEvents: Pick<SecurityEventService, "findForUser" | "listForUser">;
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
+};
+
+type SecurityEventRouteParams = {
+  eventId: string;
 };
 
 const securityEventTypes = [
@@ -148,4 +153,43 @@ export async function registerSecurityEventRoutes(
       throw error;
     }
   });
+
+  app.get<{ Params: SecurityEventRouteParams }>(
+    "/v1/security-events/:eventId",
+    async (request, reply) => {
+      const token = request.cookies[dependencies.sessionCookieName];
+
+      if (!token) {
+        return reply.status(401).send({
+          error: "unauthenticated",
+          message: "Session cookie was not found"
+        });
+      }
+
+      const session = await dependencies.sessionService.authenticate(token);
+
+      if (!session) {
+        return reply.status(401).send({
+          error: "unauthenticated",
+          message: "Session is invalid or expired"
+        });
+      }
+
+      const event = await dependencies.securityEvents.findForUser(
+        session.userId,
+        request.params.eventId as SecurityEventId
+      );
+
+      if (!event) {
+        return reply.status(404).send({
+          error: "security_event_not_found",
+          message: "Security event was not found"
+        });
+      }
+
+      return reply.send({
+        event: serializeSecurityEvent(event)
+      });
+    }
+  );
 }

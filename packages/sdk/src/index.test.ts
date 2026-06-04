@@ -281,6 +281,46 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("gets a security event with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      event: {
+        id: "event_123",
+        userId: "user_123",
+        actorUserId: "user_123",
+        sessionId: "session_123",
+        eventType: "session_revoked",
+        outcome: "success",
+        riskLevel: "low",
+        metadata: {
+          reason: "targeted_revoke"
+        },
+        context: {},
+        createdAt: "2026-06-04T12:00:00.000Z"
+      }
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.securityEvent("event/123");
+
+    expect(result.event.id).toBe("event_123");
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/security-events/event%2F123"
+      }
+    ]);
+  });
+
   it("lists passkeys with credentials", async () => {
     const { calls, fetch } = createFetchStub({
       passkeys: [

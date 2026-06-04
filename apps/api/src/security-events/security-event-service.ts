@@ -2,6 +2,7 @@ import type {
   RequestContext,
   RiskLevel,
   SecurityEvent,
+  SecurityEventId,
   SecurityEventOutcome,
   SecurityEventType,
   SessionId,
@@ -21,6 +22,7 @@ export type RecordSecurityEventInput = {
 };
 
 export type SecurityEventService = {
+  findForUser(userId: UserId, eventId: SecurityEventId): Promise<SecurityEvent | null>;
   record(input: RecordSecurityEventInput): Promise<SecurityEvent>;
   listForUser(userId: UserId, input?: ListSecurityEventsInput): Promise<ListSecurityEventsPage>;
 };
@@ -125,8 +127,15 @@ function decodeCursor(cursor: string | undefined): SecurityEventCursor | undefin
 
 export class DefaultSecurityEventService implements SecurityEventService {
   constructor(
-    private readonly store: Pick<IdentityStore, "createSecurityEvent" | "listSecurityEventsForUser">
+    private readonly store: Pick<
+      IdentityStore,
+      "createSecurityEvent" | "findSecurityEventForUser" | "listSecurityEventsForUser"
+    >
   ) {}
+
+  async findForUser(userId: UserId, eventId: SecurityEventId): Promise<SecurityEvent | null> {
+    return this.store.findSecurityEventForUser(userId, eventId);
+  }
 
   async record(input: RecordSecurityEventInput): Promise<SecurityEvent> {
     return this.store.createSecurityEvent({

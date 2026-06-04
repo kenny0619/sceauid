@@ -333,6 +333,7 @@ Current passkey route error codes:
 - `registration_finish_failed`
 - `login_start_failed`
 - `login_finish_failed`
+- `security_event_not_found`
 
 ## Security Events
 
@@ -390,6 +391,35 @@ Response:
 `eventType` is optional and can be provided more than once or as a comma-separated list.
 
 `outcome` and `riskLevel` are optional filters and follow the same repeated or comma-separated format.
+
+### Get Security Event
+
+`GET /v1/security-events/:eventId`
+
+Authenticated clients can fetch one security event from the current user's timeline.
+
+Response:
+
+```json
+{
+  "event": {
+    "id": "event_123",
+    "userId": "user_123",
+    "actorUserId": "user_123",
+    "sessionId": "session_123",
+    "eventType": "session_revoked",
+    "outcome": "success",
+    "riskLevel": "low",
+    "metadata": {
+      "reason": "targeted_revoke"
+    },
+    "context": {},
+    "createdAt": "2026-06-04T12:00:00.000Z"
+  }
+}
+```
+
+Events outside the authenticated user are returned as `404` with `error: "security_event_not_found"`.
 
 These events are intended to support account timelines, user-facing security history, investigation workflows, and future webhook delivery.
 
