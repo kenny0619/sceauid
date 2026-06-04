@@ -245,6 +245,41 @@ Passkeys outside the authenticated user are returned as `404` with `error: "pass
 
 Revoking the final active passkey is rejected as `409` with `error: "last_passkey_required"`.
 
+## Recovery Codes
+
+Recovery codes give an authenticated user a fallback they can store offline before they lose access to their passkeys.
+
+### Recovery Code Status
+
+`GET /v1/recovery/status`
+
+Response:
+
+```json
+{
+  "recoveryCodesConfigured": true,
+  "unusedRecoveryCodeCount": 10
+}
+```
+
+The status endpoint never returns code values.
+
+### Enroll Recovery Codes
+
+`POST /v1/recovery/codes`
+
+Response:
+
+```json
+{
+  "codes": ["ABCDE-FGHIJ-KLMNO-PQRST"],
+  "recoveryCodesConfigured": true,
+  "unusedRecoveryCodeCount": 10
+}
+```
+
+Enrollment returns the plain recovery codes once. Existing unused recovery codes for the user are invalidated before the new set is stored. SceauID stores code hashes only, so product applications should ask users to copy or download the returned codes immediately.
+
 ## Session List
 
 `GET /v1/sessions`
@@ -333,6 +368,7 @@ Current passkey route error codes:
 - `registration_finish_failed`
 - `login_start_failed`
 - `login_finish_failed`
+- `unauthenticated`
 - `security_event_not_found`
 
 ## Security Events
