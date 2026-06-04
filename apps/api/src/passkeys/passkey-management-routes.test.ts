@@ -38,6 +38,7 @@ const passkey: PasskeyCredential = {
 function createApp(options: {
   authenticatedSession?: Session | null;
   passkeys?: PasskeyCredential[];
+  revokedCredentials?: Array<{ credentialId: string; revokedAt: Date }>;
 }) {
   const app = Fastify();
   void app.register(cookie);
@@ -53,8 +54,12 @@ function createApp(options: {
       async listPasskeysForUser(listUserId) {
         expect(listUserId).toBe(userId);
         return options.passkeys ?? [];
+      },
+      async revokePasskeyCredential(credentialId, revokedAt) {
+        options.revokedCredentials?.push({ credentialId, revokedAt });
       }
-    }
+    },
+    now: () => new Date("2026-06-01T13:00:00.000Z")
   });
 
   return app;
@@ -128,5 +133,100 @@ describe("passkey management routes", () => {
       error: "unauthenticated",
       message: "Session is invalid or expired"
     });
+  });
+
+  it("revokes a passkey owned by the authenticated user", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      passkeys: [passkey],
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedCredentials).toEqual([
+      {
+        credentialId: "credential-public-id",
+        revokedAt: new Date("2026-06-01T13:00:00.000Z")
+      }
+    ]);
+  });
+
+  it("rejects passkey revoke requests outside the authenticated user", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      passkeys: [passkey],
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/foreign-passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "passkey_not_found",
+      message: "Passkey was not found"
+    });
+    expect(revokedCredentials).toEqual([]);
+  });
+
+  it("rejects passkey revoke requests without a session cookie", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      passkeys: [passkey],
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session cookie was not found"
+    });
+    expect(revokedCredentials).toEqual([]);
+  });
+
+  it("rejects passkey revoke requests with an invalid session", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: null,
+      passkeys: [passkey],
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session is invalid or expired"
+    });
+    expect(revokedCredentials).toEqual([]);
   });
 });

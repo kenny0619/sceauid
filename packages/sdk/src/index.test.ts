@@ -310,6 +310,31 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("revokes a passkey with credentials", async () => {
+    const { calls, fetch } = createFetchStub({ ok: true });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.revokePasskey("passkey/123");
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "DELETE"
+        },
+        url: "https://identity.example.com/v1/passkeys/passkey%2F123"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {

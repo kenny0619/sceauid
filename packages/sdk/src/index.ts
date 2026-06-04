@@ -284,6 +284,12 @@ export class SceauIDClient {
     return this.request("/v1/passkeys");
   }
 
+  async revokePasskey(passkeyId: string): Promise<LogoutResponse> {
+    return this.request(`/v1/passkeys/${encodeURIComponent(passkeyId)}`, {
+      method: "DELETE"
+    });
+  }
+
   async meta(): Promise<unknown> {
     return this.request("/v1/meta");
   }
