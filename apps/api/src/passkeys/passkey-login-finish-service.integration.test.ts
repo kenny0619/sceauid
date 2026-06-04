@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { InMemoryChallengeStore } from "../challenges/in-memory-challenge-store.js";
 import { createPostgresStoreTestContext, createTestUser } from "../db/postgres-test-harness.js";
+import { DefaultSecurityEventService } from "../security-events/security-event-service.js";
 import { DefaultSessionService } from "../sessions/session-service.js";
 import type { SessionToken } from "../sessions/session-token.js";
 import {
@@ -60,6 +61,7 @@ describe("DefaultPasskeyLoginFinishService integration", () => {
       now: () => now,
       generateToken: () => "session-token" as SessionToken
     });
+    const securityEvents = new DefaultSecurityEventService(context.store);
     const service = new DefaultPasskeyLoginFinishService(
       context.store,
       challengeStore,
@@ -70,7 +72,8 @@ describe("DefaultPasskeyLoginFinishService integration", () => {
       },
       {
         now: () => now,
-        verifyAuthentication
+        verifyAuthentication,
+        securityEvents
       }
     );
 
@@ -118,5 +121,21 @@ describe("DefaultPasskeyLoginFinishService integration", () => {
         token: "session-token"
       }
     });
+    await expect(context.store.listSecurityEventsForUser(user.id, 10)).resolves.toMatchObject([
+      {
+        userId: user.id,
+        sessionId: result.session.session.id,
+        eventType: "login_succeeded",
+        outcome: "success",
+        metadata: {
+          credentialId: "credential-id",
+          loginId: "login-id"
+        },
+        context: {
+          ipHash: "ip-hash",
+          userAgent: "test-agent"
+        }
+      }
+    ]);
   });
 });

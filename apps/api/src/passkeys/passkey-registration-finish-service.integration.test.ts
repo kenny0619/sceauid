@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { InMemoryChallengeStore } from "../challenges/in-memory-challenge-store.js";
 import { createPostgresStoreTestContext, createTestUser } from "../db/postgres-test-harness.js";
+import { DefaultSecurityEventService } from "../security-events/security-event-service.js";
 import { DefaultPasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { VerifyRegistrationResponse } from "./passkey-registration-finish-service.js";
 
@@ -52,6 +53,7 @@ describe("DefaultPasskeyRegistrationFinishService integration", () => {
       },
       expiresAt: new Date("2026-06-01T12:05:00.000Z")
     });
+    const securityEvents = new DefaultSecurityEventService(context.store);
     const service = new DefaultPasskeyRegistrationFinishService(
       context.store,
       challengeStore,
@@ -59,7 +61,7 @@ describe("DefaultPasskeyRegistrationFinishService integration", () => {
         rpId: "localhost",
         origin: "http://localhost:3000"
       },
-      { verifyRegistration }
+      { verifyRegistration, securityEvents }
     );
 
     const result = await service.finish({
@@ -89,5 +91,17 @@ describe("DefaultPasskeyRegistrationFinishService integration", () => {
     await expect(
       challengeStore.consumeChallenge("registration-id", "passkey_registration")
     ).resolves.toBeNull();
+    await expect(context.store.listSecurityEventsForUser(user.id, 10)).resolves.toMatchObject([
+      {
+        userId: user.id,
+        eventType: "passkey_registered",
+        outcome: "success",
+        metadata: {
+          credentialId: "credential-id",
+          deviceName: "MacBook",
+          registrationId: "registration-id"
+        }
+      }
+    ]);
   });
 });

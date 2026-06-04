@@ -10,6 +10,7 @@ import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-
 import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-registration-finish-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
+import { DefaultSecurityEventService } from "./security-events/security-event-service.js";
 import { DefaultSessionService } from "./sessions/session-service.js";
 
 const config = loadConfig();
@@ -17,10 +18,18 @@ const databaseClient = createDatabaseClient(config);
 const identityStore = new PostgresIdentityStore(databaseClient.db);
 const challengeStore = await createRedisChallengeStore(config.REDIS_URL);
 const sessionService = new DefaultSessionService(identityStore);
-const loginStartService = new DefaultPasskeyLoginStartService(identityStore, challengeStore.store, {
-  rpId: config.WEBAUTHN_RP_ID,
-  origin: config.APP_ORIGIN
-});
+const securityEvents = new DefaultSecurityEventService(identityStore);
+const loginStartService = new DefaultPasskeyLoginStartService(
+  identityStore,
+  challengeStore.store,
+  {
+    rpId: config.WEBAUTHN_RP_ID,
+    origin: config.APP_ORIGIN
+  },
+  {
+    securityEvents
+  }
+);
 const loginFinishService = new DefaultPasskeyLoginFinishService(
   identityStore,
   challengeStore.store,
@@ -28,6 +37,9 @@ const loginFinishService = new DefaultPasskeyLoginFinishService(
   {
     rpId: config.WEBAUTHN_RP_ID,
     origin: config.APP_ORIGIN
+  },
+  {
+    securityEvents
   }
 );
 const registrationStartService = new DefaultPasskeyRegistrationStartService(
@@ -37,6 +49,9 @@ const registrationStartService = new DefaultPasskeyRegistrationStartService(
     rpName: config.WEBAUTHN_RP_NAME,
     rpId: config.WEBAUTHN_RP_ID,
     origin: config.APP_ORIGIN
+  },
+  {
+    securityEvents
   }
 );
 const registrationFinishService = new DefaultPasskeyRegistrationFinishService(
@@ -45,6 +60,9 @@ const registrationFinishService = new DefaultPasskeyRegistrationFinishService(
   {
     rpId: config.WEBAUTHN_RP_ID,
     origin: config.APP_ORIGIN
+  },
+  {
+    securityEvents
   }
 );
 
