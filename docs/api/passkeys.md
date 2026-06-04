@@ -227,6 +227,22 @@ Response:
 
 The response does not expose credential public keys or other verifier material.
 
+## Revoke A Passkey
+
+`DELETE /v1/passkeys/:passkeyId`
+
+Authenticated clients can revoke a passkey returned by `GET /v1/passkeys`.
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+Passkeys outside the authenticated user are returned as `404` with `error: "passkey_not_found"`.
+
 ## Session List
 
 `GET /v1/sessions`
