@@ -96,6 +96,7 @@ await registerPasskeyRoutes(app, {
   }
 });
 await registerSessionRoutes(app, {
+  securityEvents,
   sessionCookie: {
     name: config.SESSION_COOKIE_NAME,
     sameSite: "lax",
