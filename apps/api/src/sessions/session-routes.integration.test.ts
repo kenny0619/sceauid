@@ -3,9 +3,9 @@ import Fastify from "fastify";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createPostgresStoreTestContext, createTestUser } from "../db/postgres-test-harness.js";
 import { DefaultSecurityEventService } from "../security-events/security-event-service.js";
+import { registerSessionRoutes } from "./session-routes.js";
 import { DefaultSessionService } from "./session-service.js";
 import type { SessionToken } from "./session-token.js";
-import { registerSessionRoutes } from "./session-routes.js";
 
 const context = createPostgresStoreTestContext();
 const now = new Date("2026-06-01T12:00:00.000Z");
