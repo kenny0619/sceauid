@@ -186,6 +186,7 @@ export type ListedSecurityEvent = {
 };
 
 export type ListSecurityEventsInput = {
+  cursor?: string;
   eventTypes?: string[];
   outcomes?: Array<"failure" | "pending" | "success">;
   riskLevels?: Array<"high" | "low" | "medium">;
@@ -194,6 +195,7 @@ export type ListSecurityEventsInput = {
 
 export type ListSecurityEventsResponse = {
   events: ListedSecurityEvent[];
+  nextCursor: string | null;
 };
 
 export type ListedPasskey = {
@@ -276,6 +278,10 @@ export class SceauIDClient {
 
     if (input.limit !== undefined) {
       searchParams.set("limit", String(input.limit));
+    }
+
+    if (input.cursor !== undefined) {
+      searchParams.set("cursor", input.cursor);
     }
 
     for (const eventType of input.eventTypes ?? []) {
