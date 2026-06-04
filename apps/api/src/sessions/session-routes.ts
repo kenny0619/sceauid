@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { Session, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import type { SessionService } from "./session-service.js";
 
 export type SessionCookieOptions = {
@@ -11,6 +12,7 @@ export type SessionCookieOptions = {
 };
 
 export type SessionRoutesDependencies = {
+  securityEvents?: Pick<SecurityEventService, "record">;
   sessionCookie: SessionCookieOptions;
   sessionService: Pick<SessionService, "authenticate" | "listForUser" | "revoke">;
   store: Pick<IdentityStore, "findUserById">;
@@ -50,6 +52,31 @@ function serializeSession(session: Session, currentSessionId: string) {
     revokedAt: session.revokedAt?.toISOString() ?? null,
     createdAt: session.createdAt.toISOString()
   };
+}
+
+async function recordSessionRevoked(
+  securityEvents: Pick<SecurityEventService, "record"> | undefined,
+  input: {
+    actorSessionId: string;
+    actorUserId: UserId;
+    reason: "current_session_logout" | "targeted_revoke";
+    targetSession: Session;
+  }
+): Promise<void> {
+  await securityEvents
+    ?.record({
+      userId: input.targetSession.userId,
+      actorUserId: input.actorUserId,
+      sessionId: input.targetSession.id,
+      eventType: "session_revoked",
+      outcome: "success",
+      metadata: {
+        actorSessionId: input.actorSessionId,
+        reason: input.reason,
+        self: input.actorSessionId === input.targetSession.id
+      }
+    })
+    .catch(() => undefined);
 }
 
 export async function registerSessionRoutes(
@@ -134,6 +161,12 @@ export async function registerSessionRoutes(
 
       if (session) {
         await dependencies.sessionService.revoke(session.id);
+        await recordSessionRevoked(dependencies.securityEvents, {
+          actorSessionId: session.id,
+          actorUserId: session.userId,
+          reason: "current_session_logout",
+          targetSession: session
+        });
       }
     }
 
@@ -174,6 +207,12 @@ export async function registerSessionRoutes(
     }
 
     await dependencies.sessionService.revoke(targetSession.id);
+    await recordSessionRevoked(dependencies.securityEvents, {
+      actorSessionId: currentSession.id,
+      actorUserId: currentSession.userId,
+      reason: "targeted_revoke",
+      targetSession
+    });
 
     if (targetSession.id === currentSession.id) {
       clearSessionCookie(reply, dependencies.sessionCookie);

@@ -2,6 +2,7 @@ import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type { Session, SessionId, User, UserId } from "../domain/identity.js";
+import type { RecordSecurityEventInput } from "../security-events/security-event-service.js";
 import { registerSessionRoutes } from "./session-routes.js";
 
 const user: User = {
@@ -28,11 +29,18 @@ function createApp(options: {
   authenticatedSession?: Session | null;
   foundUser?: User | null;
   revokedSessionIds?: SessionId[];
+  securityEvents?: RecordSecurityEventInput[];
   sessionsForUser?: Session[];
 }) {
   const app = Fastify();
   void app.register(cookie);
   void registerSessionRoutes(app, {
+    securityEvents: {
+      async record(input) {
+        options.securityEvents?.push(input);
+        return undefined as never;
+      }
+    },
     sessionCookie: {
       name: "sceauid_session",
       secure: true
@@ -245,10 +253,12 @@ describe("session routes", () => {
 
   it("revokes the current session and clears the session cookie", async () => {
     const revokedSessionIds: SessionId[] = [];
+    const securityEvents: RecordSecurityEventInput[] = [];
     const app = createApp({
       authenticatedSession: session,
       foundUser: user,
-      revokedSessionIds
+      revokedSessionIds,
+      securityEvents
     });
 
     const response = await app.inject({
@@ -266,6 +276,20 @@ describe("session routes", () => {
     expect(response.headers["set-cookie"]).toContain("Path=/");
     expect(response.headers["set-cookie"]).toContain("Secure");
     expect(response.headers["set-cookie"]).toContain("SameSite=Lax");
+    expect(securityEvents).toEqual([
+      {
+        userId: "user-id",
+        actorUserId: "user-id",
+        sessionId: "session-id",
+        eventType: "session_revoked",
+        outcome: "success",
+        metadata: {
+          actorSessionId: "session-id",
+          reason: "current_session_logout",
+          self: true
+        }
+      }
+    ]);
   });
 
   it("clears the session cookie even when no active session exists", async () => {
@@ -311,6 +335,7 @@ describe("session routes", () => {
 
   it("revokes another session owned by the authenticated user", async () => {
     const revokedSessionIds: SessionId[] = [];
+    const securityEvents: RecordSecurityEventInput[] = [];
     const otherSession: Session = {
       ...session,
       id: "other-session-id" as SessionId,
@@ -320,6 +345,7 @@ describe("session routes", () => {
       authenticatedSession: session,
       foundUser: user,
       revokedSessionIds,
+      securityEvents,
       sessionsForUser: [session, otherSession]
     });
 
@@ -335,14 +361,30 @@ describe("session routes", () => {
     expect(response.json()).toEqual({ ok: true });
     expect(revokedSessionIds).toEqual(["other-session-id"]);
     expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(securityEvents).toEqual([
+      {
+        userId: "user-id",
+        actorUserId: "user-id",
+        sessionId: "other-session-id",
+        eventType: "session_revoked",
+        outcome: "success",
+        metadata: {
+          actorSessionId: "session-id",
+          reason: "targeted_revoke",
+          self: false
+        }
+      }
+    ]);
   });
 
   it("clears the session cookie when revoking the current session by id", async () => {
     const revokedSessionIds: SessionId[] = [];
+    const securityEvents: RecordSecurityEventInput[] = [];
     const app = createApp({
       authenticatedSession: session,
       foundUser: user,
       revokedSessionIds,
+      securityEvents,
       sessionsForUser: [session]
     });
 
@@ -358,6 +400,20 @@ describe("session routes", () => {
     expect(response.json()).toEqual({ ok: true });
     expect(revokedSessionIds).toEqual(["session-id"]);
     expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
+    expect(securityEvents).toEqual([
+      {
+        userId: "user-id",
+        actorUserId: "user-id",
+        sessionId: "session-id",
+        eventType: "session_revoked",
+        outcome: "success",
+        metadata: {
+          actorSessionId: "session-id",
+          reason: "targeted_revoke",
+          self: true
+        }
+      }
+    ]);
   });
 
   it("rejects session revoke requests for sessions outside the authenticated user", async () => {

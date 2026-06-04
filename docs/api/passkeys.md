@@ -301,6 +301,9 @@ Current events include:
 - `login_started`
 - `login_succeeded`
 - `login_failed`
+- `session_revoked`
+
+Session revocation events include metadata for `reason`, `actorSessionId`, and whether the revoked session was the actor's own session.
 
 These events are intended to support account timelines, user-facing security history, investigation workflows, and future webhook delivery.
 
