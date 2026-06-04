@@ -10,6 +10,9 @@ import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 
 export type RecoveryCodeService = {
+  completeRecoveryRequest(
+    recoveryRequestId: RecoveryRequestId
+  ): Promise<CompleteRecoveryRequestResult>;
   enroll(input: EnrollRecoveryCodesInput): Promise<EnrollRecoveryCodesResult>;
   redeem(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResult>;
   recoveryRequestStatus(recoveryRequestId: RecoveryRequestId): Promise<RecoveryRequestStatusResult>;
@@ -56,6 +59,15 @@ export type RecoveryRequestStatusResult = {
   };
 };
 
+export type CompleteRecoveryRequestResult = {
+  ok: true;
+  recoveryRequest: {
+    id: RecoveryRequestId;
+    completedAt: Date;
+    status: "completed";
+  };
+};
+
 export type RecoveryCodeServiceOptions = {
   codeCount?: number;
   now?: () => Date;
@@ -93,6 +105,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   constructor(
     private readonly store: Pick<
       IdentityStore,
+      | "completeActiveRecoveryRequest"
       | "consumeRecoveryCode"
       | "countUnusedRecoveryCodesForUser"
       | "createRecoveryRequest"
@@ -108,6 +121,55 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     this.recoveryRequestTtlSeconds =
       options.recoveryRequestTtlSeconds ?? defaultRecoveryRequestTtlSeconds;
     this.securityEvents = options.securityEvents;
+  }
+
+  async completeRecoveryRequest(
+    recoveryRequestId: RecoveryRequestId
+  ): Promise<CompleteRecoveryRequestResult> {
+    const completedAt = this.now();
+    const completed = await this.store.completeActiveRecoveryRequest(
+      recoveryRequestId,
+      completedAt
+    );
+
+    if (!completed) {
+      const existingRequest = await this.store.findRecoveryRequestById(recoveryRequestId);
+
+      if (!existingRequest) {
+        throw new Error("Recovery request was not found");
+      }
+
+      if (existingRequest.status !== "pending") {
+        throw new Error("Recovery request is not pending");
+      }
+
+      if (existingRequest.expiresAt <= completedAt) {
+        throw new Error("Recovery request is expired");
+      }
+
+      throw new Error("Recovery request could not be completed");
+    }
+
+    await this.recordSecurityEvent({
+      userId: completed.userId,
+      actorUserId: completed.userId,
+      eventType: "recovery_completed",
+      outcome: "success",
+      riskLevel: completed.riskLevel,
+      metadata: {
+        recoveryRequestId: completed.id,
+        completedAt: completedAt.toISOString()
+      }
+    });
+
+    return {
+      ok: true,
+      recoveryRequest: {
+        id: completed.id,
+        completedAt,
+        status: "completed"
+      }
+    };
   }
 
   async enroll(input: EnrollRecoveryCodesInput): Promise<EnrollRecoveryCodesResult> {
