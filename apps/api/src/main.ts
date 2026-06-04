@@ -11,8 +11,8 @@ import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-regi
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
 import { DefaultSecurityEventService } from "./security-events/security-event-service.js";
-import { DefaultSessionService } from "./sessions/session-service.js";
 import { registerSessionRoutes } from "./sessions/session-routes.js";
+import { DefaultSessionService } from "./sessions/session-service.js";
 
 const config = loadConfig();
 const databaseClient = createDatabaseClient(config);
