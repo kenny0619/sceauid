@@ -186,6 +186,7 @@ export type ListedSecurityEvent = {
 };
 
 export type ListSecurityEventsInput = {
+  eventTypes?: string[];
   limit?: number;
 };
 
@@ -273,6 +274,10 @@ export class SceauIDClient {
 
     if (input.limit !== undefined) {
       searchParams.set("limit", String(input.limit));
+    }
+
+    for (const eventType of input.eventTypes ?? []) {
+      searchParams.append("eventType", eventType);
     }
 
     const query = searchParams.toString();

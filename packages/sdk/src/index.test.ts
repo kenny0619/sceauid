@@ -255,7 +255,10 @@ describe("SceauIDClient", () => {
       fetch
     });
 
-    const result = await client.securityEvents({ limit: 10 });
+    const result = await client.securityEvents({
+      eventTypes: ["login_failed", "session_revoked"],
+      limit: 10
+    });
 
     expect(result.events).toHaveLength(1);
     expect(calls).toEqual([
@@ -268,7 +271,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/security-events?limit=10"
+        url: "https://identity.example.com/v1/security-events?limit=10&eventType=login_failed&eventType=session_revoked"
       }
     ]);
   });
