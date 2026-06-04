@@ -249,6 +249,15 @@ export type RecoveryRequestStatusResponse = {
   };
 };
 
+export type CompleteRecoveryRequestResponse = {
+  ok: true;
+  recoveryRequest: {
+    id: string;
+    completedAt: string;
+    status: "completed";
+  };
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -371,6 +380,14 @@ export class SceauIDClient {
 
   async recoveryRequestStatus(recoveryRequestId: string): Promise<RecoveryRequestStatusResponse> {
     return this.request(`/v1/recovery/requests/${encodeURIComponent(recoveryRequestId)}`);
+  }
+
+  async completeRecoveryRequest(
+    recoveryRequestId: string
+  ): Promise<CompleteRecoveryRequestResponse> {
+    return this.request(`/v1/recovery/requests/${encodeURIComponent(recoveryRequestId)}/complete`, {
+      method: "POST"
+    });
   }
 
   async meta(): Promise<unknown> {
