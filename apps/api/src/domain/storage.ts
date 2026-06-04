@@ -89,6 +89,7 @@ export type IdentityStore = {
   completeRecoveryRequest(userId: UserId, completedAt: Date): Promise<void>;
 
   createSecurityEvent(input: CreateSecurityEventInput): Promise<SecurityEvent>;
+  findSecurityEventForUser(userId: UserId, eventId: SecurityEventId): Promise<SecurityEvent | null>;
   listSecurityEventsForUser(filter: SecurityEventFilter): Promise<SecurityEventPage>;
 };
 

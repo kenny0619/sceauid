@@ -1,5 +1,10 @@
 import { and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
-import { type SessionId, type UserId, normalizeEmail } from "../domain/identity.js";
+import {
+  type SecurityEventId,
+  type SessionId,
+  type UserId,
+  normalizeEmail
+} from "../domain/identity.js";
 import type {
   CreateEmailAddressInput,
   CreatePasskeyCredentialInput,
@@ -270,6 +275,16 @@ export class PostgresIdentityStore implements IdentityStore {
       .returning();
 
     return mapSecurityEvent(event);
+  }
+
+  async findSecurityEventForUser(userId: UserId, eventId: SecurityEventId) {
+    const [event] = await this.db
+      .select()
+      .from(securityEvents)
+      .where(and(eq(securityEvents.userId, userId), eq(securityEvents.id, eventId)))
+      .limit(1);
+
+    return event ? mapSecurityEvent(event) : null;
   }
 
   async listSecurityEventsForUser(filter: SecurityEventFilter) {
