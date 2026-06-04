@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import type {
   SecurityEvent,
   SecurityEventId,
+  SecurityEventType,
   Session,
   SessionId,
   UserId
 } from "../domain/identity.js";
+import type { ListSecurityEventsInput } from "./security-event-service.js";
 import { registerSecurityEventRoutes } from "./security-event-routes.js";
 
 const userId = "user-id" as UserId;
@@ -43,14 +45,14 @@ const event: SecurityEvent = {
 function createApp(options: {
   authenticatedSession?: Session | null;
   events?: SecurityEvent[];
-  listCalls?: Array<{ userId: UserId; limit?: number }>;
+  listCalls?: Array<{ userId: UserId; input?: ListSecurityEventsInput }>;
 }) {
   const app = Fastify();
   void app.register(cookie);
   void registerSecurityEventRoutes(app, {
     securityEvents: {
-      async listForUser(userId, limit) {
-        options.listCalls?.push({ userId, limit });
+      async listForUser(userId, input) {
+        options.listCalls?.push({ userId, input });
         return options.events ?? [];
       }
     },
@@ -68,7 +70,7 @@ function createApp(options: {
 
 describe("security event routes", () => {
   it("lists security events for the authenticated user", async () => {
-    const listCalls: Array<{ userId: UserId; limit?: number }> = [];
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
     const app = createApp({
       authenticatedSession: session,
       events: [event],
@@ -84,7 +86,7 @@ describe("security event routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(listCalls).toEqual([{ userId, limit: 10 }]);
+    expect(listCalls).toEqual([{ userId, input: { eventTypes: undefined, limit: 10 } }]);
     expect(response.json()).toEqual({
       events: [
         {
@@ -105,6 +107,34 @@ describe("security event routes", () => {
         }
       ]
     });
+  });
+
+  it("filters security events by event type", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?eventType=login_failed,session_revoked",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls).toEqual([
+      {
+        userId,
+        input: {
+          eventTypes: ["login_failed", "session_revoked"] satisfies SecurityEventType[],
+          limit: undefined
+        }
+      }
+    ]);
   });
 
   it("rejects requests without a session cookie", async () => {
@@ -155,6 +185,27 @@ describe("security event routes", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/security-events?limit=0",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_request",
+      message: "Query parameters did not match the security event list schema"
+    });
+  });
+
+  it("rejects unknown event type filters", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?eventType=unknown_event",
       cookies: {
         sceauid_session: "session-token"
       }
