@@ -1,15 +1,28 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { UserId } from "../domain/identity.js";
+import type { PasskeyLoginFinishService } from "./passkey-login-finish-service.js";
 import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { PasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
 
 export type PasskeyRoutesDependencies = {
+  loginFinishService: PasskeyLoginFinishService;
   loginStartService: PasskeyLoginStartService;
   registrationFinishService: PasskeyRegistrationFinishService;
   registrationStartService: PasskeyRegistrationStartService;
 };
+
+const authenticatorAttachmentSchema = z.enum(["cross-platform", "platform"]);
+const authenticatorTransportSchema = z.enum([
+  "ble",
+  "cable",
+  "hybrid",
+  "internal",
+  "nfc",
+  "smart-card",
+  "usb"
+]);
 
 const startLoginBodySchema = z
   .object({
@@ -32,17 +45,33 @@ const finishRegistrationBodySchema = z.object({
       clientDataJSON: z.string().min(1),
       attestationObject: z.string().min(1),
       authenticatorData: z.string().min(1).optional(),
-      transports: z
-        .array(z.enum(["ble", "cable", "hybrid", "internal", "nfc", "smart-card", "usb"]))
-        .optional(),
+      transports: z.array(authenticatorTransportSchema).optional(),
       publicKeyAlgorithm: z.number().optional(),
       publicKey: z.string().min(1).optional()
     }),
-    authenticatorAttachment: z.enum(["cross-platform", "platform"]).optional(),
+    authenticatorAttachment: authenticatorAttachmentSchema.optional(),
     clientExtensionResults: z.record(z.unknown()),
     type: z.literal("public-key")
   }),
   deviceName: z.string().min(1).nullable().optional()
+});
+
+const finishLoginBodySchema = z.object({
+  loginId: z.string().min(1),
+  credential: z.object({
+    id: z.string().min(1),
+    rawId: z.string().min(1),
+    response: z.object({
+      clientDataJSON: z.string().min(1),
+      authenticatorData: z.string().min(1),
+      signature: z.string().min(1),
+      userHandle: z.string().min(1).optional()
+    }),
+    authenticatorAttachment: authenticatorAttachmentSchema.optional(),
+    clientExtensionResults: z.record(z.unknown()),
+    type: z.literal("public-key")
+  }),
+  deviceLabel: z.string().min(1).nullable().optional()
 });
 
 function resolveRegistrationStartStatus(error: unknown): number {
@@ -75,6 +104,35 @@ function resolveLoginStartStatus(error: unknown): number {
     error.message === "User has no active passkeys"
   ) {
     return 409;
+  }
+
+  return 500;
+}
+
+function resolveLoginFinishStatus(error: unknown): number {
+  if (!(error instanceof Error)) {
+    return 500;
+  }
+
+  if (
+    error.message === "Passkey login challenge was not found" ||
+    error.message === "Passkey credential was not found" ||
+    error.message === "User was not found"
+  ) {
+    return 404;
+  }
+
+  if (error.message === "User cannot finish passkey login unless active") {
+    return 409;
+  }
+
+  if (
+    error.message === "Passkey login verification failed" ||
+    error.message === "Passkey login challenge payload is invalid" ||
+    error.message === "Passkey login challenge does not match credential owner" ||
+    error.message === "Passkey login challenge does not match relying party config"
+  ) {
+    return 400;
   }
 
   return 500;
@@ -144,6 +202,56 @@ export async function registerPasskeyRoutes(
       return reply.status(status).send({
         error: "login_start_failed",
         message: error instanceof Error ? error.message : "Unable to start passkey login"
+      });
+    }
+  });
+
+  app.post("/v1/passkeys/login/finish", async (request, reply) => {
+    const body = finishLoginBodySchema.safeParse(request.body);
+
+    if (!body.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Request body did not match the passkey login finish schema"
+      });
+    }
+
+    try {
+      const result = await dependencies.loginFinishService.finish({
+        loginId: body.data.loginId,
+        credential: body.data.credential,
+        deviceLabel: body.data.deviceLabel,
+        context: {
+          ...(typeof request.headers["user-agent"] === "string"
+            ? { userAgent: request.headers["user-agent"] }
+            : {})
+        }
+      });
+
+      return reply.send({
+        userId: result.userId,
+        credential: {
+          id: result.credential.id,
+          credentialId: result.credential.credentialId,
+          signCount: result.credential.signCount,
+          lastUsedAt: result.credential.lastUsedAt?.toISOString() ?? null
+        },
+        session: {
+          id: result.session.session.id,
+          token: result.session.token,
+          expiresAt: result.session.session.expiresAt.toISOString()
+        }
+      });
+    } catch (error) {
+      const status = resolveLoginFinishStatus(error);
+
+      if (status === 500) {
+        throw error;
+      }
+
+      return reply.status(status).send({
+        error: "login_finish_failed",
+        message: error instanceof Error ? error.message : "Unable to finish passkey login"
       });
     }
   });
