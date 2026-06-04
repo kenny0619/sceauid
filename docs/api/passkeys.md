@@ -243,6 +243,8 @@ Response:
 
 Passkeys outside the authenticated user are returned as `404` with `error: "passkey_not_found"`.
 
+Revoking the final active passkey is rejected as `409` with `error: "last_passkey_required"`.
+
 ## Session List
 
 `GET /v1/sessions`
@@ -326,6 +328,7 @@ Client errors use a consistent JSON shape:
 Current passkey route error codes:
 
 - `invalid_request`
+- `last_passkey_required`
 - `registration_start_failed`
 - `registration_finish_failed`
 - `login_start_failed`
