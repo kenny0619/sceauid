@@ -102,6 +102,24 @@ describe("PostgresIdentityStore recovery", () => {
     ).resolves.toBeNull();
   });
 
+  it("finds recovery requests by id", async () => {
+    const user = await createTestUser(context);
+    const expiresAt = new Date("2026-06-01T12:05:00.000Z");
+
+    const request = await context.store.createRecoveryRequest({
+      userId: user.id,
+      riskLevel: "medium",
+      expiresAt
+    });
+
+    await expect(context.store.findRecoveryRequestById(request.id)).resolves.toMatchObject({
+      id: request.id,
+      status: "pending",
+      riskLevel: "medium",
+      expiresAt
+    });
+  });
+
   it("completes pending recovery requests", async () => {
     const user = await createTestUser(context);
     const now = new Date("2026-06-01T12:00:00.000Z");
