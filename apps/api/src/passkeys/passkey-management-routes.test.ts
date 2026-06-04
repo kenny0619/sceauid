@@ -37,6 +37,18 @@ const passkey: PasskeyCredential = {
   revokedAt: null
 };
 
+const backupPasskey: PasskeyCredential = {
+  ...passkey,
+  id: "backup-passkey-id" as PasskeyCredentialId,
+  credentialId: "backup-credential-public-id",
+  deviceName: "YubiKey"
+};
+
+const revokedBackupPasskey: PasskeyCredential = {
+  ...backupPasskey,
+  revokedAt: new Date("2026-06-01T12:45:00.000Z")
+};
+
 function createApp(options: {
   authenticatedSession?: Session | null;
   passkeys?: PasskeyCredential[];
@@ -164,7 +176,7 @@ describe("passkey management routes", () => {
     const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
     const app = createApp({
       authenticatedSession: session,
-      passkeys: [passkey],
+      passkeys: [passkey, backupPasskey],
       recordedSecurityEvents,
       revokedCredentials
     });
@@ -206,7 +218,7 @@ describe("passkey management routes", () => {
     const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
     const app = createApp({
       authenticatedSession: session,
-      passkeys: [passkey],
+      passkeys: [passkey, backupPasskey],
       recordSecurityEventError: new Error("audit sink unavailable"),
       revokedCredentials
     });
@@ -227,6 +239,33 @@ describe("passkey management routes", () => {
         revokedAt: new Date("2026-06-01T13:00:00.000Z")
       }
     ]);
+  });
+
+  it("rejects revoking the last active passkey", async () => {
+    const recordedSecurityEvents: RecordSecurityEventInput[] = [];
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      passkeys: [passkey, revokedBackupPasskey],
+      recordedSecurityEvents,
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "last_passkey_required",
+      message: "At least one active passkey must remain on the account"
+    });
+    expect(revokedCredentials).toEqual([]);
+    expect(recordedSecurityEvents).toEqual([]);
   });
 
   it("rejects passkey revoke requests outside the authenticated user", async () => {
