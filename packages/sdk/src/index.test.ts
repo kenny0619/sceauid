@@ -206,6 +206,31 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("revokes a session with credentials", async () => {
+    const { calls, fetch } = createFetchStub({ ok: true });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.revokeSession("session/123");
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "DELETE"
+        },
+        url: "https://identity.example.com/v1/sessions/session%2F123"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {

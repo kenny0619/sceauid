@@ -227,6 +227,12 @@ export class SceauIDClient {
     });
   }
 
+  async revokeSession(sessionId: string): Promise<LogoutResponse> {
+    return this.request(`/v1/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE"
+    });
+  }
+
   async meta(): Promise<unknown> {
     return this.request("/v1/meta");
   }
