@@ -27,15 +27,22 @@ const session: Session = {
 function createApp(options: {
   authenticatedSession?: Session | null;
   foundUser?: User | null;
+  revokedSessionIds?: SessionId[];
 }) {
   const app = Fastify();
   void app.register(cookie);
   void registerSessionRoutes(app, {
-    sessionCookieName: "sceauid_session",
+    sessionCookie: {
+      name: "sceauid_session",
+      secure: true
+    },
     sessionService: {
       async authenticate(token) {
         expect(token).toBe("session-token");
         return options.authenticatedSession ?? null;
+      },
+      async revoke(sessionId) {
+        options.revokedSessionIds?.push(sessionId);
       }
     },
     store: {
@@ -139,5 +146,71 @@ describe("session routes", () => {
       error: "unauthenticated",
       message: "Session user was not found"
     });
+  });
+
+  it("revokes the current session and clears the session cookie", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      revokedSessionIds
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/current",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedSessionIds).toEqual(["session-id"]);
+    expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
+    expect(response.headers["set-cookie"]).toContain("Path=/");
+    expect(response.headers["set-cookie"]).toContain("Secure");
+    expect(response.headers["set-cookie"]).toContain("SameSite=Lax");
+  });
+
+  it("clears the session cookie even when no active session exists", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: null,
+      foundUser: user,
+      revokedSessionIds
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/current",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedSessionIds).toEqual([]);
+    expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
+  });
+
+  it("clears the session cookie even when the request has no cookie", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      revokedSessionIds
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/current"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedSessionIds).toEqual([]);
+    expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
   });
 });
