@@ -7,6 +7,7 @@ import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
 import { DefaultPasskeyLoginFinishService } from "./passkeys/passkey-login-finish-service.js";
 import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-service.js";
+import { registerPasskeyManagementRoutes } from "./passkeys/passkey-management-routes.js";
 import { DefaultPasskeyRegistrationFinishService } from "./passkeys/passkey-registration-finish-service.js";
 import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-registration-start-service.js";
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
@@ -95,6 +96,11 @@ await registerPasskeyRoutes(app, {
     sameSite: "lax",
     secure: config.NODE_ENV === "production"
   }
+});
+await registerPasskeyManagementRoutes(app, {
+  sessionCookieName: config.SESSION_COOKIE_NAME,
+  sessionService,
+  store: identityStore
 });
 await registerSessionRoutes(app, {
   securityEvents,
