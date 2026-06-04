@@ -16,6 +16,10 @@ type PasskeyRouteParams = {
   passkeyId: string;
 };
 
+function activePasskeyCount(passkeys: PasskeyCredential[]): number {
+  return passkeys.filter((credential) => credential.revokedAt === null).length;
+}
+
 async function recordPasskeyRemoved(
   securityEvents: Pick<SecurityEventService, "record"> | undefined,
   input: {
@@ -112,6 +116,13 @@ export async function registerPasskeyManagementRoutes(
       return reply.status(404).send({
         error: "passkey_not_found",
         message: "Passkey was not found"
+      });
+    }
+
+    if (passkey.revokedAt === null && activePasskeyCount(passkeys) <= 1) {
+      return reply.status(409).send({
+        error: "last_passkey_required",
+        message: "At least one active passkey must remain on the account"
       });
     }
 
