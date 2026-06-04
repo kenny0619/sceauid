@@ -286,7 +286,11 @@ describe("session routes", () => {
         metadata: {
           actorSessionId: "session-id",
           reason: "current_session_logout",
-          self: true
+          self: true,
+          targetCreatedAt: "2026-06-01T12:00:00.000Z",
+          targetDeviceLabel: "Safari on macOS",
+          targetExpiresAt: "2026-07-01T12:00:00.000Z",
+          targetUserAgent: "test-agent"
         }
       }
     ]);
@@ -371,7 +375,11 @@ describe("session routes", () => {
         metadata: {
           actorSessionId: "session-id",
           reason: "targeted_revoke",
-          self: false
+          self: false,
+          targetCreatedAt: "2026-06-01T12:00:00.000Z",
+          targetDeviceLabel: "Chrome on Windows",
+          targetExpiresAt: "2026-07-01T12:00:00.000Z",
+          targetUserAgent: "test-agent"
         }
       }
     ]);
@@ -410,7 +418,11 @@ describe("session routes", () => {
         metadata: {
           actorSessionId: "session-id",
           reason: "targeted_revoke",
-          self: true
+          self: true,
+          targetCreatedAt: "2026-06-01T12:00:00.000Z",
+          targetDeviceLabel: "Safari on macOS",
+          targetExpiresAt: "2026-07-01T12:00:00.000Z",
+          targetUserAgent: "test-agent"
         }
       }
     ]);
