@@ -6,11 +6,20 @@ import type { PasskeyLoginStartService } from "./passkey-login-start-service.js"
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { PasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
 
+export type SessionCookieOptions = {
+  httpOnly?: boolean;
+  name: string;
+  path?: string;
+  sameSite?: "lax" | "none" | "strict";
+  secure?: boolean;
+};
+
 export type PasskeyRoutesDependencies = {
   loginFinishService: PasskeyLoginFinishService;
   loginStartService: PasskeyLoginStartService;
   registrationFinishService: PasskeyRegistrationFinishService;
   registrationStartService: PasskeyRegistrationStartService;
+  sessionCookie?: SessionCookieOptions;
 };
 
 const authenticatorAttachmentSchema = z.enum(["cross-platform", "platform"]);
