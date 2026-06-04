@@ -93,17 +93,19 @@ describe("DefaultPasskeyRegistrationFinishService integration", () => {
     ).resolves.toBeNull();
     await expect(
       context.store.listSecurityEventsForUser({ userId: user.id, limit: 10 })
-    ).resolves.toMatchObject([
-      {
-        userId: user.id,
-        eventType: "passkey_registered",
-        outcome: "success",
-        metadata: {
-          credentialId: "credential-id",
-          deviceName: "MacBook",
-          registrationId: "registration-id"
+    ).resolves.toMatchObject({
+      events: [
+        {
+          userId: user.id,
+          eventType: "passkey_registered",
+          outcome: "success",
+          metadata: {
+            credentialId: "credential-id",
+            deviceName: "MacBook",
+            registrationId: "registration-id"
+          }
         }
-      }
-    ]);
+      ]
+    });
   });
 });

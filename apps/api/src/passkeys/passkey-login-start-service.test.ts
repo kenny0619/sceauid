@@ -97,7 +97,7 @@ function createFakeSecurityEvents() {
       return undefined as never;
     },
     async listForUser() {
-      return [];
+      return { events: [] };
     }
   };
 

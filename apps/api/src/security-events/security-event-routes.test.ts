@@ -47,6 +47,7 @@ const event: SecurityEvent = {
 function createApp(options: {
   authenticatedSession?: Session | null;
   events?: SecurityEvent[];
+  nextCursor?: string;
   listCalls?: Array<{ userId: UserId; input?: ListSecurityEventsInput }>;
 }) {
   const app = Fastify();
@@ -55,7 +56,10 @@ function createApp(options: {
     securityEvents: {
       async listForUser(userId, input) {
         options.listCalls?.push({ userId, input });
-        return options.events ?? [];
+        return {
+          events: options.events ?? [],
+          nextCursor: options.nextCursor
+        };
       }
     },
     sessionCookieName: "sceauid_session",
@@ -91,7 +95,13 @@ describe("security event routes", () => {
     expect(listCalls).toEqual([
       {
         userId,
-        input: { eventTypes: undefined, outcomes: undefined, riskLevels: undefined, limit: 10 }
+        input: {
+          cursor: undefined,
+          eventTypes: undefined,
+          outcomes: undefined,
+          riskLevels: undefined,
+          limit: 10
+        }
       }
     ]);
     expect(response.json()).toEqual({
@@ -112,7 +122,43 @@ describe("security event routes", () => {
           },
           createdAt: "2026-06-01T12:01:00.000Z"
         }
-      ]
+      ],
+      nextCursor: null
+    });
+  });
+
+  it("returns the next cursor for paginated security events", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      nextCursor: "next-page-token",
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?limit=10&cursor=current-page-token",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls).toEqual([
+      {
+        userId,
+        input: {
+          cursor: "current-page-token",
+          eventTypes: undefined,
+          outcomes: undefined,
+          riskLevels: undefined,
+          limit: 10
+        }
+      }
+    ]);
+    expect(response.json()).toMatchObject({
+      nextCursor: "next-page-token"
     });
   });
 
@@ -137,6 +183,7 @@ describe("security event routes", () => {
       {
         userId,
         input: {
+          cursor: undefined,
           eventTypes: ["login_failed", "session_revoked"] satisfies SecurityEventType[],
           limit: undefined
         }
@@ -165,6 +212,7 @@ describe("security event routes", () => {
       {
         userId,
         input: {
+          cursor: undefined,
           eventTypes: undefined,
           outcomes: ["failure", "pending"] satisfies SecurityEventOutcome[],
           riskLevels: ["medium", "high"] satisfies RiskLevel[],

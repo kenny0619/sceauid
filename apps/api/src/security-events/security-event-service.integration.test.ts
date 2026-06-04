@@ -34,10 +34,10 @@ describe("DefaultSecurityEventService integration", () => {
       }
     });
 
-    const events = await service.listForUser(user.id);
+    const page = await service.listForUser(user.id);
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
+    expect(page.events).toHaveLength(1);
+    expect(page.events[0]).toMatchObject({
       userId: user.id,
       actorUserId: user.id,
       sessionId: null,
