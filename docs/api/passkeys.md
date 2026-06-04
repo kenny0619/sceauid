@@ -201,6 +201,32 @@ Response:
 
 Missing, expired, revoked, or invalid sessions return `401` with `error: "unauthenticated"`.
 
+## Passkey List
+
+`GET /v1/passkeys`
+
+Authenticated clients can list registered passkeys for the current user.
+
+Response:
+
+```json
+{
+  "passkeys": [
+    {
+      "id": "passkey_123",
+      "credentialId": "credential_public_id",
+      "deviceName": "MacBook Pro",
+      "signCount": 8,
+      "lastUsedAt": "2026-06-04T12:00:00.000Z",
+      "createdAt": "2026-06-01T12:00:00.000Z",
+      "revokedAt": null
+    }
+  ]
+}
+```
+
+The response does not expose credential public keys or other verifier material.
+
 ## Session List
 
 `GET /v1/sessions`

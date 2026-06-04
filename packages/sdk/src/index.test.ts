@@ -273,6 +273,43 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("lists passkeys with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      passkeys: [
+        {
+          id: "passkey_123",
+          credentialId: "credential_public_id",
+          deviceName: "MacBook Pro",
+          signCount: 8,
+          lastUsedAt: "2026-06-04T12:00:00.000Z",
+          createdAt: "2026-06-01T12:00:00.000Z",
+          revokedAt: null
+        }
+      ]
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.passkeys();
+
+    expect(result.passkeys).toHaveLength(1);
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/passkeys"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {
