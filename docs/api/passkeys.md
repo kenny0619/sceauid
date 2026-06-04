@@ -227,6 +227,22 @@ Response:
 
 The response does not expose token hashes or IP hashes.
 
+## Revoke A Session
+
+`DELETE /v1/sessions/:sessionId`
+
+Authenticated clients can revoke a session returned by `GET /v1/sessions`.
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+If the revoked session is the current cookie-backed session, the API also clears the session cookie. Sessions outside the authenticated user are returned as `404` with `error: "session_not_found"`.
+
 ## Logout
 
 `DELETE /v1/sessions/current`

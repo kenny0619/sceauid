@@ -308,4 +308,127 @@ describe("session routes", () => {
     expect(revokedSessionIds).toEqual([]);
     expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
   });
+
+  it("revokes another session owned by the authenticated user", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const otherSession: Session = {
+      ...session,
+      id: "other-session-id" as SessionId,
+      deviceLabel: "Chrome on Windows"
+    };
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [session, otherSession]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/other-session-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedSessionIds).toEqual(["other-session-id"]);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("clears the session cookie when revoking the current session by id", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [session]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/session-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedSessionIds).toEqual(["session-id"]);
+    expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
+  });
+
+  it("rejects session revoke requests for sessions outside the authenticated user", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [session]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/foreign-session-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "session_not_found",
+      message: "Session was not found"
+    });
+    expect(revokedSessionIds).toEqual([]);
+  });
+
+  it("rejects session revoke requests without a session cookie", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: session,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [session]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/session-id"
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session cookie was not found"
+    });
+    expect(revokedSessionIds).toEqual([]);
+  });
+
+  it("rejects session revoke requests with an invalid session", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: null,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [session]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/session-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "unauthenticated",
+      message: "Session is invalid or expired"
+    });
+    expect(revokedSessionIds).toEqual([]);
+  });
 });
