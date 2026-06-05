@@ -24,7 +24,7 @@ const identityStore = new PostgresIdentityStore(databaseClient.db);
 const challengeStore = await createRedisChallengeStore(config.REDIS_URL);
 const sessionService = new DefaultSessionService(identityStore);
 const securityEvents = new DefaultSecurityEventService(identityStore);
-const recoveryCodes = new DefaultRecoveryCodeService(identityStore, {
+const recoveryCodes = new DefaultRecoveryCodeService(identityStore, sessionService, {
   securityEvents
 });
 const loginStartService = new DefaultPasskeyLoginStartService(
