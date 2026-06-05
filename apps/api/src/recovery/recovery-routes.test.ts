@@ -49,6 +49,11 @@ function createApp(
 
         return {
           ok: true,
+          recoverySession: {
+            id: "recovery-session-id" as SessionId,
+            token: "recovery-session-token",
+            expiresAt: new Date("2026-06-01T12:16:00.000Z")
+          },
           recoveryRequest: {
             id: statusRecoveryRequestId,
             completedAt: new Date("2026-06-01T12:01:00.000Z"),
@@ -272,6 +277,11 @@ describe("recovery routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       ok: true,
+      recoverySession: {
+        id: "recovery-session-id",
+        token: "recovery-session-token",
+        expiresAt: "2026-06-01T12:16:00.000Z"
+      },
       recoveryRequest: {
         id: recoveryRequestId,
         completedAt: "2026-06-01T12:01:00.000Z",
