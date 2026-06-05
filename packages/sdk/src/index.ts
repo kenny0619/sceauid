@@ -251,6 +251,11 @@ export type RecoveryRequestStatusResponse = {
 
 export type CompleteRecoveryRequestResponse = {
   ok: true;
+  recoverySession: {
+    id: string;
+    token: string;
+    expiresAt: string;
+  };
   recoveryRequest: {
     id: string;
     completedAt: string;
