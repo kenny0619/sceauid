@@ -263,6 +263,12 @@ export type CompleteRecoveryRequestResponse = {
   };
 };
 
+export type StartRecoveryPasskeyRegistrationInput = {
+  recoverySessionToken: string;
+  userName: string;
+  userDisplayName?: string | null;
+};
+
 export class SceauIDClient {
   private readonly baseUrl: string;
   private readonly fetcher: SceauIDFetch;
@@ -391,6 +397,15 @@ export class SceauIDClient {
     recoveryRequestId: string
   ): Promise<CompleteRecoveryRequestResponse> {
     return this.request(`/v1/recovery/requests/${encodeURIComponent(recoveryRequestId)}/complete`, {
+      method: "POST"
+    });
+  }
+
+  async startRecoveryPasskeyRegistration(
+    input: StartRecoveryPasskeyRegistrationInput
+  ): Promise<PasskeyRegistrationStartResponse> {
+    return this.request("/v1/recovery/passkeys/registration/start", {
+      body: input,
       method: "POST"
     });
   }

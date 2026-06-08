@@ -557,6 +557,46 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("starts recovery passkey registration", async () => {
+    const { calls, fetch } = createFetchStub({
+      registrationId: "registration_123",
+      expiresAt: "2026-06-01T12:05:00.000Z",
+      options: {
+        challenge: "challenge"
+      }
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.startRecoveryPasskeyRegistration({
+      recoverySessionToken: "recovery_session_token",
+      userName: "ibukunoluwa@example.com",
+      userDisplayName: "Ibukunoluwa Kehinde"
+    });
+
+    expect(result.registrationId).toBe("registration_123");
+    expect(calls).toEqual([
+      {
+        init: {
+          body: JSON.stringify({
+            recoverySessionToken: "recovery_session_token",
+            userName: "ibukunoluwa@example.com",
+            userDisplayName: "Ibukunoluwa Kehinde"
+          }),
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json"
+          },
+          method: "POST"
+        },
+        url: "https://identity.example.com/v1/recovery/passkeys/registration/start"
+      }
+    ]);
+  });
+
   it("throws a structured SceauIDError for failed requests", async () => {
     const { fetch } = createFetchStub(
       {
