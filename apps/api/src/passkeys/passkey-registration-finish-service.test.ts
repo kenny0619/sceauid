@@ -1,6 +1,12 @@
 import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { describe, expect, it } from "vitest";
-import type { PasskeyCredential, PasskeyCredentialId, User, UserId } from "../domain/identity.js";
+import type {
+  PasskeyCredential,
+  PasskeyCredentialId,
+  SessionId,
+  User,
+  UserId
+} from "../domain/identity.js";
 import type {
   ChallengePurpose,
   ChallengeRecord,
@@ -9,6 +15,7 @@ import type {
   IdentityStore
 } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import type { SessionService } from "../sessions/session-service.js";
 import {
   DefaultPasskeyRegistrationFinishService,
   type VerifyRegistrationResponse
@@ -169,6 +176,17 @@ function createFakeSecurityEvents() {
   return { service, records };
 }
 
+function createFakeSessionService() {
+  const revoked: SessionId[] = [];
+  const service: Pick<SessionService, "revoke"> = {
+    async revoke(sessionId) {
+      revoked.push(sessionId);
+    }
+  };
+
+  return { service, revoked };
+}
+
 function createService(
   options: {
     challenge?: ChallengeRecord | null;
@@ -186,6 +204,7 @@ function createService(
   });
   const verification = createFakeVerifyRegistration(options.verified ?? true);
   const securityEvents = createFakeSecurityEvents();
+  const sessionService = createFakeSessionService();
   const service = new DefaultPasskeyRegistrationFinishService(
     identityStore.store,
     challengeStore.store,
@@ -195,16 +214,17 @@ function createService(
     },
     {
       verifyRegistration: verification.verifyRegistration,
-      securityEvents: securityEvents.service
+      securityEvents: securityEvents.service,
+      sessionService: sessionService.service
     }
   );
 
-  return { service, challengeStore, identityStore, securityEvents, verification };
+  return { service, challengeStore, identityStore, securityEvents, sessionService, verification };
 }
 
 describe("DefaultPasskeyRegistrationFinishService", () => {
   it("verifies registration and persists the passkey credential", async () => {
-    const { service, challengeStore, identityStore, securityEvents, verification } =
+    const { service, challengeStore, identityStore, securityEvents, sessionService, verification } =
       createService();
 
     const result = await service.finish({
@@ -241,6 +261,7 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
         deviceName: "MacBook"
       }
     });
+    expect(sessionService.revoked).toEqual([]);
     expect(securityEvents.records).toEqual([
       {
         userId,
@@ -259,7 +280,7 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
   });
 
   it("carries recovery registration context into audit metadata", async () => {
-    const { service, securityEvents } = createService({
+    const { service, securityEvents, sessionService } = createService({
       challenge: createChallenge({
         payload: {
           challenge: "public-challenge",
@@ -280,15 +301,35 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
       deviceName: "iPhone"
     });
 
-    expect(securityEvents.records[0]).toMatchObject({
-      eventType: "passkey_registered",
-      metadata: {
-        registrationContext: {
-          flow: "recovery",
-          recoverySessionId: "recovery-session-id"
+    expect(sessionService.revoked).toEqual(["recovery-session-id"]);
+    expect(securityEvents.records).toMatchObject([
+      {
+        userId,
+        actorUserId: userId,
+        sessionId: "recovery-session-id",
+        eventType: "session_revoked",
+        outcome: "success",
+        metadata: {
+          credentialId: "credential-id",
+          reason: "recovery_passkey_registered",
+          registrationId: "registration-id",
+          registrationContext: {
+            flow: "recovery",
+            recoverySessionId: "recovery-session-id"
+          }
+        }
+      },
+      {
+        eventType: "passkey_registered",
+        metadata: {
+          recoverySessionFinalized: true,
+          registrationContext: {
+            flow: "recovery",
+            recoverySessionId: "recovery-session-id"
+          }
         }
       }
-    });
+    ]);
   });
 
   it("rejects missing challenges and failed verification", async () => {
