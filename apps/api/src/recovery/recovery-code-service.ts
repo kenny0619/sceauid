@@ -8,6 +8,7 @@ import type {
 } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import type { CreatedSession, SessionService } from "../sessions/session-service.js";
 
 export type RecoveryCodeService = {
   completeRecoveryRequest(
@@ -61,6 +62,11 @@ export type RecoveryRequestStatusResult = {
 
 export type CompleteRecoveryRequestResult = {
   ok: true;
+  recoverySession: {
+    id: SessionId;
+    token: string;
+    expiresAt: Date;
+  };
   recoveryRequest: {
     id: RecoveryRequestId;
     completedAt: Date;
@@ -73,11 +79,13 @@ export type RecoveryCodeServiceOptions = {
   now?: () => Date;
   randomBytes?: (size: number) => Buffer;
   recoveryRequestTtlSeconds?: number;
+  recoverySessionTtlSeconds?: number;
   securityEvents?: SecurityEventService;
 };
 
 const defaultCodeCount = 10;
 const defaultRecoveryRequestTtlSeconds = 60 * 15;
+const defaultRecoverySessionTtlSeconds = 60 * 15;
 const codeByteLength = 10;
 
 function formatRecoveryCode(bytes: Buffer): string {
@@ -100,6 +108,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   private readonly now: () => Date;
   private readonly randomBytes: (size: number) => Buffer;
   private readonly recoveryRequestTtlSeconds: number;
+  private readonly recoverySessionTtlSeconds: number;
   private readonly securityEvents: SecurityEventService | undefined;
 
   constructor(
@@ -113,6 +122,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       | "findRecoveryRequestById"
       | "markUnusedRecoveryCodesUsed"
     >,
+    private readonly sessionService: Pick<SessionService, "create">,
     options: RecoveryCodeServiceOptions = {}
   ) {
     this.codeCount = options.codeCount ?? defaultCodeCount;
@@ -120,6 +130,8 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     this.randomBytes = options.randomBytes ?? randomBytes;
     this.recoveryRequestTtlSeconds =
       options.recoveryRequestTtlSeconds ?? defaultRecoveryRequestTtlSeconds;
+    this.recoverySessionTtlSeconds =
+      options.recoverySessionTtlSeconds ?? defaultRecoverySessionTtlSeconds;
     this.securityEvents = options.securityEvents;
   }
 
@@ -150,20 +162,34 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       throw new Error("Recovery request could not be completed");
     }
 
+    const recoverySession = await this.sessionService.create({
+      userId: completed.userId,
+      deviceLabel: "Recovery session",
+      ttlSeconds: this.recoverySessionTtlSeconds
+    });
+
     await this.recordSecurityEvent({
       userId: completed.userId,
       actorUserId: completed.userId,
+      sessionId: recoverySession.session.id,
       eventType: "recovery_completed",
       outcome: "success",
       riskLevel: completed.riskLevel,
       metadata: {
         recoveryRequestId: completed.id,
+        recoverySessionId: recoverySession.session.id,
         completedAt: completedAt.toISOString()
       }
     });
+    await this.recordSessionCreatedEvent(completed, recoverySession);
 
     return {
       ok: true,
+      recoverySession: {
+        id: recoverySession.session.id,
+        token: recoverySession.token,
+        expiresAt: recoverySession.session.expiresAt
+      },
       recoveryRequest: {
         id: completed.id,
         completedAt,
@@ -284,5 +310,26 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     input: Parameters<SecurityEventService["record"]>[0]
   ): Promise<void> {
     await this.securityEvents?.record(input).catch(() => undefined);
+  }
+
+  private async recordSessionCreatedEvent(
+    recoveryRequest: RecoveryRequest,
+    recoverySession: CreatedSession
+  ): Promise<void> {
+    await this.recordSecurityEvent({
+      userId: recoveryRequest.userId,
+      sessionId: recoverySession.session.id,
+      eventType: "session_created",
+      outcome: "success",
+      riskLevel: recoveryRequest.riskLevel,
+      metadata: {
+        deviceLabel: recoverySession.session.deviceLabel,
+        expiresAt: recoverySession.session.expiresAt.toISOString(),
+        ipHashPresent: recoverySession.session.ipHash !== null,
+        recoveryRequestId: recoveryRequest.id,
+        reason: "recovery_completed",
+        userAgent: recoverySession.session.userAgent
+      }
+    });
   }
 }

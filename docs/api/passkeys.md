@@ -335,6 +335,11 @@ Response:
 ```json
 {
   "ok": true,
+  "recoverySession": {
+    "id": "session_123",
+    "token": "recovery_session_token",
+    "expiresAt": "2026-06-01T12:16:00.000Z"
+  },
   "recoveryRequest": {
     "id": "recovery_request_123",
     "completedAt": "2026-06-01T12:01:00.000Z",
@@ -344,6 +349,8 @@ Response:
 ```
 
 Only pending and unexpired recovery requests can be completed. Unknown requests return `404` with `error: "recovery_request_not_found"`. Expired requests return `409` with `error: "recovery_request_expired"`. Requests that are already completed, verified, cancelled, or otherwise no longer pending return `409` with `error: "recovery_request_not_pending"`.
+
+The recovery session token is short-lived and gives the product application a bounded handoff credential for the next recovery step, such as passkey re-enrollment.
 
 ## Session List
 

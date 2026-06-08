@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
-import type { RecoveryRequest, RecoveryRequestId, SessionId, UserId } from "../domain/identity.js";
+import type {
+  RecoveryRequest,
+  RecoveryRequestId,
+  Session,
+  SessionId,
+  UserId
+} from "../domain/identity.js";
 import type {
   CreateRecoveryCodeInput,
   CreateRecoveryRequestInput,
   IdentityStore
 } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import type { SessionService } from "../sessions/session-service.js";
+import type { SessionToken } from "../sessions/session-token.js";
 import {
   DefaultRecoveryCodeService,
   hashRecoveryCode,
@@ -14,7 +22,9 @@ import {
 
 const userId = "user-id" as UserId;
 const sessionId = "session-id" as SessionId;
+const recoverySessionId = "recovery-session-id" as SessionId;
 const recoveryRequestId = "recovery-request-id" as RecoveryRequestId;
+const recoverySessionToken = "recovery-session-token" as SessionToken;
 
 function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   const consumedCodes: Array<{ codeHash: string; usedAt: Date; userId: UserId }> = [];
@@ -22,6 +32,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   const createdRecoveryRequests: CreateRecoveryRequestInput[] = [];
   const markedUsed: Array<{ userId: UserId; usedAt: Date }> = [];
   const recordedEvents: Array<Parameters<SecurityEventService["record"]>[0]> = [];
+  const createdSessions: Array<Parameters<SessionService["create"]>[0]> = [];
   let consumeRecoveryCodeResult = true;
   let recoveryRequest: RecoveryRequest | null = {
     id: recoveryRequestId,
@@ -110,10 +121,34 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     }
   };
 
+  const sessionService: Pick<SessionService, "create"> = {
+    async create(input) {
+      createdSessions.push(input);
+
+      const session: Session = {
+        id: recoverySessionId,
+        userId: input.userId,
+        tokenHash: "token-hash",
+        deviceLabel: input.deviceLabel ?? null,
+        userAgent: input.context?.userAgent ?? null,
+        ipHash: input.context?.ipHash ?? null,
+        expiresAt: new Date("2026-06-01T12:16:00.000Z"),
+        revokedAt: null,
+        createdAt: new Date("2026-06-01T12:01:00.000Z")
+      };
+
+      return {
+        session,
+        token: recoverySessionToken
+      };
+    }
+  };
+
   return {
     consumedCodes,
     createdCodes,
     createdRecoveryRequests,
+    createdSessions,
     markRecoveryCodeInvalid() {
       consumeRecoveryCodeResult = false;
     },
@@ -140,6 +175,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     markedUsed,
     recordedEvents,
     securityEvents,
+    sessionService,
     store
   };
 }
@@ -151,9 +187,10 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("rotates unused recovery codes and returns the new codes once", async () => {
-    const { createdCodes, markedUsed, recordedEvents, securityEvents, store } = createFakeStore();
+    const { createdCodes, markedUsed, recordedEvents, securityEvents, sessionService, store } =
+      createFakeStore();
     let byte = 0;
-    const service = new DefaultRecoveryCodeService(store, {
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
       codeCount: 2,
       now: () => new Date("2026-06-01T12:00:00.000Z"),
       randomBytes(size) {
@@ -198,8 +235,8 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("returns recovery code enrollment status without codes", async () => {
-    const { store } = createFakeStore({ unusedRecoveryCodeCount: 3 });
-    const service = new DefaultRecoveryCodeService(store);
+    const { sessionService, store } = createFakeStore({ unusedRecoveryCodeCount: 3 });
+    const service = new DefaultRecoveryCodeService(store, sessionService);
 
     await expect(service.status(userId)).resolves.toEqual({
       recoveryCodesConfigured: true,
@@ -208,9 +245,15 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("redeems a recovery code using its normalized hash", async () => {
-    const { consumedCodes, createdRecoveryRequests, recordedEvents, securityEvents, store } =
-      createFakeStore();
-    const service = new DefaultRecoveryCodeService(store, {
+    const {
+      consumedCodes,
+      createdRecoveryRequests,
+      recordedEvents,
+      securityEvents,
+      sessionService,
+      store
+    } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
       now: () => new Date("2026-06-01T12:00:00.000Z"),
       recoveryRequestTtlSeconds: 300,
       securityEvents
@@ -255,9 +298,10 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("rejects invalid or used recovery codes", async () => {
-    const { markRecoveryCodeInvalid, recordedEvents, securityEvents, store } = createFakeStore();
+    const { markRecoveryCodeInvalid, recordedEvents, securityEvents, sessionService, store } =
+      createFakeStore();
     markRecoveryCodeInvalid();
-    const service = new DefaultRecoveryCodeService(store, { securityEvents });
+    const service = new DefaultRecoveryCodeService(store, sessionService, { securityEvents });
 
     await expect(service.redeem({ code: "invalid-code", userId })).rejects.toThrow(
       "Recovery code was invalid or already used"
@@ -266,8 +310,8 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("returns recovery request status", async () => {
-    const { store } = createFakeStore();
-    const service = new DefaultRecoveryCodeService(store, {
+    const { sessionService, store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
       now: () => new Date("2026-06-01T12:00:00.000Z")
     });
 
@@ -283,8 +327,8 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("reports expired pending recovery requests as inactive", async () => {
-    const { store } = createFakeStore();
-    const service = new DefaultRecoveryCodeService(store, {
+    const { sessionService, store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
       now: () => new Date("2026-06-01T12:06:00.000Z")
     });
 
@@ -297,9 +341,9 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("rejects unknown recovery request status lookups", async () => {
-    const { markRecoveryRequestMissing, store } = createFakeStore();
+    const { markRecoveryRequestMissing, sessionService, store } = createFakeStore();
     markRecoveryRequestMissing();
-    const service = new DefaultRecoveryCodeService(store);
+    const service = new DefaultRecoveryCodeService(store, sessionService);
 
     await expect(service.recoveryRequestStatus(recoveryRequestId)).rejects.toThrow(
       "Recovery request was not found"
@@ -307,39 +351,70 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("completes active recovery requests", async () => {
-    const { recordedEvents, securityEvents, store } = createFakeStore();
-    const service = new DefaultRecoveryCodeService(store, {
+    const { createdSessions, recordedEvents, securityEvents, sessionService, store } =
+      createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
       now: () => new Date("2026-06-01T12:01:00.000Z"),
+      recoverySessionTtlSeconds: 300,
       securityEvents
     });
 
     await expect(service.completeRecoveryRequest(recoveryRequestId)).resolves.toEqual({
       ok: true,
+      recoverySession: {
+        id: recoverySessionId,
+        token: recoverySessionToken,
+        expiresAt: new Date("2026-06-01T12:16:00.000Z")
+      },
       recoveryRequest: {
         id: recoveryRequestId,
         completedAt: new Date("2026-06-01T12:01:00.000Z"),
         status: "completed"
       }
     });
+    expect(createdSessions).toEqual([
+      {
+        userId,
+        deviceLabel: "Recovery session",
+        ttlSeconds: 300
+      }
+    ]);
     expect(recordedEvents).toEqual([
       {
         actorUserId: userId,
         eventType: "recovery_completed",
         metadata: {
           recoveryRequestId,
+          recoverySessionId,
           completedAt: "2026-06-01T12:01:00.000Z"
         },
         outcome: "success",
         riskLevel: "medium",
+        sessionId: recoverySessionId,
+        userId
+      },
+      {
+        eventType: "session_created",
+        metadata: {
+          deviceLabel: "Recovery session",
+          expiresAt: "2026-06-01T12:16:00.000Z",
+          ipHashPresent: false,
+          reason: "recovery_completed",
+          recoveryRequestId,
+          userAgent: null
+        },
+        outcome: "success",
+        riskLevel: "medium",
+        sessionId: recoverySessionId,
         userId
       }
     ]);
   });
 
   it("rejects expired recovery request completion", async () => {
-    const { markRecoveryRequestExpired, store } = createFakeStore();
+    const { markRecoveryRequestExpired, sessionService, store } = createFakeStore();
     markRecoveryRequestExpired();
-    const service = new DefaultRecoveryCodeService(store, {
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
       now: () => new Date("2026-06-01T12:01:00.000Z")
     });
 
@@ -349,9 +424,9 @@ describe("DefaultRecoveryCodeService", () => {
   });
 
   it("rejects non-pending recovery request completion", async () => {
-    const { markRecoveryRequestCompleted, store } = createFakeStore();
+    const { markRecoveryRequestCompleted, sessionService, store } = createFakeStore();
     markRecoveryRequestCompleted();
-    const service = new DefaultRecoveryCodeService(store);
+    const service = new DefaultRecoveryCodeService(store, sessionService);
 
     await expect(service.completeRecoveryRequest(recoveryRequestId)).rejects.toThrow(
       "Recovery request is not pending"

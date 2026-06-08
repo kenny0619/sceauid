@@ -522,6 +522,11 @@ describe("SceauIDClient", () => {
   it("completes a recovery request", async () => {
     const { calls, fetch } = createFetchStub({
       ok: true,
+      recoverySession: {
+        id: "recovery_session_123",
+        token: "recovery_session_token",
+        expiresAt: "2026-06-01T12:16:00.000Z"
+      },
       recoveryRequest: {
         id: "recovery/request/123",
         completedAt: "2026-06-01T12:01:00.000Z",
@@ -535,6 +540,7 @@ describe("SceauIDClient", () => {
 
     const result = await client.completeRecoveryRequest("recovery/request/123");
 
+    expect(result.recoverySession.token).toBe("recovery_session_token");
     expect(result.recoveryRequest.status).toBe("completed");
     expect(calls).toEqual([
       {
