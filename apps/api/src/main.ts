@@ -119,6 +119,7 @@ await registerSessionRoutes(app, {
   store: identityStore
 });
 await registerRecoveryRoutes(app, {
+  passkeyRegistrationStartService: registrationStartService,
   recoveryCodes,
   sessionCookieName: config.SESSION_COOKIE_NAME,
   sessionService
