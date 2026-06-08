@@ -18,21 +18,65 @@ const session: Session = {
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
+const recoverySession: Session = {
+  ...session,
+  id: "recovery-session-id" as SessionId,
+  deviceLabel: "Recovery session"
+};
+
 function createApp(
   options: {
     authenticatedSession?: Session | null;
+    recoverySession?: Session | null;
     rejectCompletion?: "expired" | "not_found" | "not_pending";
+    rejectRegistrationStart?: "not_active" | "not_found";
     rejectRecoveryRequestLookup?: boolean;
     rejectRedemption?: boolean;
   } = {}
 ) {
   const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
+  const registrationStarts: Array<{
+    userDisplayName?: string | null;
+    userId: UserId;
+    userName: string;
+  }> = [];
   const redeemedCodes: Array<{ code: string; userId: UserId }> = [];
   const statusUsers: UserId[] = [];
   const app = Fastify();
 
   void app.register(cookie);
   void registerRecoveryRoutes(app, {
+    passkeyRegistrationStartService: {
+      async start(input) {
+        registrationStarts.push(input);
+
+        if (options.rejectRegistrationStart === "not_found") {
+          throw new Error("User was not found");
+        }
+
+        if (options.rejectRegistrationStart === "not_active") {
+          throw new Error("User cannot register passkeys unless active");
+        }
+
+        return {
+          registrationId: "registration-id",
+          expiresAt: new Date("2026-06-01T12:05:00.000Z"),
+          options: {
+            challenge: "challenge",
+            pubKeyCredParams: [],
+            rp: {
+              id: "identity.example.com",
+              name: "SceauID"
+            },
+            user: {
+              displayName: "Ibukunoluwa Kehinde",
+              id: "user-id",
+              name: "ibukunoluwa@example.com"
+            }
+          }
+        };
+      }
+    },
     recoveryCodes: {
       async completeRecoveryRequest(statusRecoveryRequestId) {
         if (options.rejectCompletion === "not_found") {
@@ -111,13 +155,16 @@ function createApp(
     sessionCookieName: "sceauid_session",
     sessionService: {
       async authenticate(token) {
-        expect(token).toBe("session-token");
+        if (token === "recovery-session-token") {
+          return options.recoverySession === undefined ? recoverySession : options.recoverySession;
+        }
+
         return options.authenticatedSession ?? null;
       }
     }
   });
 
-  return { app, enrollments, redeemedCodes, statusUsers };
+  return { app, enrollments, redeemedCodes, registrationStarts, statusUsers };
 }
 
 describe("recovery routes", () => {
@@ -332,6 +379,84 @@ describe("recovery routes", () => {
     expect(response.json()).toEqual({
       error: "recovery_request_not_pending",
       message: "Recovery request is not pending"
+    });
+  });
+
+  it("starts passkey registration with a recovery session", async () => {
+    const { app, registrationStarts } = createApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/passkeys/registration/start",
+      payload: {
+        recoverySessionToken: "recovery-session-token",
+        userName: "ibukunoluwa@example.com",
+        userDisplayName: "Ibukunoluwa Kehinde"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(registrationStarts).toEqual([
+      {
+        userId,
+        userName: "ibukunoluwa@example.com",
+        userDisplayName: "Ibukunoluwa Kehinde"
+      }
+    ]);
+    expect(response.json()).toEqual({
+      registrationId: "registration-id",
+      expiresAt: "2026-06-01T12:05:00.000Z",
+      options: {
+        challenge: "challenge",
+        pubKeyCredParams: [],
+        rp: {
+          id: "identity.example.com",
+          name: "SceauID"
+        },
+        user: {
+          displayName: "Ibukunoluwa Kehinde",
+          id: "user-id",
+          name: "ibukunoluwa@example.com"
+        }
+      }
+    });
+  });
+
+  it("rejects invalid recovery sessions for passkey registration", async () => {
+    const { app } = createApp({ recoverySession: null });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/passkeys/registration/start",
+      payload: {
+        recoverySessionToken: "recovery-session-token",
+        userName: "ibukunoluwa@example.com"
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "invalid_recovery_session",
+      message: "Recovery session is invalid or expired"
+    });
+  });
+
+  it("rejects non-recovery sessions for recovery passkey registration", async () => {
+    const { app } = createApp({ recoverySession: session });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/passkeys/registration/start",
+      payload: {
+        recoverySessionToken: "recovery-session-token",
+        userName: "ibukunoluwa@example.com"
+      }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({
+      error: "invalid_recovery_session",
+      message: "Recovery session is invalid or expired"
     });
   });
 

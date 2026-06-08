@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { RecoveryRequestId, UserId } from "../domain/identity.js";
+import type { PasskeyRegistrationStartService } from "../passkeys/passkey-registration-start-service.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { RecoveryCodeService } from "./recovery-code-service.js";
 
 export type RecoveryRoutesDependencies = {
+  passkeyRegistrationStartService: PasskeyRegistrationStartService;
   recoveryCodes: RecoveryCodeService;
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
@@ -18,6 +20,14 @@ const redeemRecoveryCodeBodySchema = z.object({
 const recoveryRequestParamsSchema = z.object({
   recoveryRequestId: z.string().min(1)
 });
+
+const recoveryPasskeyRegistrationStartBodySchema = z.object({
+  recoverySessionToken: z.string().min(1),
+  userName: z.string().min(1),
+  userDisplayName: z.string().min(1).nullable().optional()
+});
+
+const recoverySessionDeviceLabel = "Recovery session";
 
 async function authenticateRequest(
   request: { cookies: Record<string, string | undefined> },
@@ -172,6 +182,57 @@ export async function registerRecoveryRoutes(
         return reply.status(409).send({
           error: "recovery_request_not_pending",
           message: "Recovery request is not pending"
+        });
+      }
+
+      throw error;
+    }
+  });
+
+  app.post("/v1/recovery/passkeys/registration/start", async (request, reply) => {
+    const body = recoveryPasskeyRegistrationStartBodySchema.safeParse(request.body);
+
+    if (!body.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Recovery passkey registration start request is invalid"
+      });
+    }
+
+    const recoverySession = await dependencies.sessionService.authenticate(
+      body.data.recoverySessionToken
+    );
+
+    if (!recoverySession || recoverySession.deviceLabel !== recoverySessionDeviceLabel) {
+      return reply.status(401).send({
+        error: "invalid_recovery_session",
+        message: "Recovery session is invalid or expired"
+      });
+    }
+
+    try {
+      return reply.send(
+        await dependencies.passkeyRegistrationStartService.start({
+          userId: recoverySession.userId,
+          userName: body.data.userName,
+          userDisplayName: body.data.userDisplayName
+        })
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "User was not found") {
+        return reply.status(404).send({
+          error: "user_not_found",
+          message: "User was not found"
+        });
+      }
+
+      if (
+        error instanceof Error &&
+        error.message === "User cannot register passkeys unless active"
+      ) {
+        return reply.status(409).send({
+          error: "user_not_active",
+          message: "User cannot register passkeys unless active"
         });
       }
 
