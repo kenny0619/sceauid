@@ -378,6 +378,8 @@ The recovery session token must come from a completed recovery request. Product 
 
 Recovery-started registrations are tagged in passkey registration security events with recovery context, including the recovery session ID.
 
+After a recovery-started passkey registration finishes successfully, SceauID revokes the short-lived recovery session and records the revocation reason as `recovery_passkey_registered`.
+
 ## Session List
 
 `GET /v1/sessions`
