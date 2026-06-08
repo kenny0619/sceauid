@@ -213,6 +213,10 @@ export async function registerRecoveryRoutes(
     try {
       return reply.send(
         await dependencies.passkeyRegistrationStartService.start({
+          context: {
+            flow: "recovery",
+            recoverySessionId: recoverySession.id
+          },
           userId: recoverySession.userId,
           userName: body.data.userName,
           userDisplayName: body.data.userDisplayName
