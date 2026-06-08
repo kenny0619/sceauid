@@ -70,7 +70,8 @@ const registrationFinishService = new DefaultPasskeyRegistrationFinishService(
     origin: config.APP_ORIGIN
   },
   {
-    securityEvents
+    securityEvents,
+    sessionService
   }
 );
 

@@ -3,9 +3,10 @@ import {
   type VerifiedRegistrationResponse,
   verifyRegistrationResponse
 } from "@simplewebauthn/server";
-import type { PasskeyCredential, User, UserId } from "../domain/identity.js";
+import type { PasskeyCredential, SessionId, User, UserId } from "../domain/identity.js";
 import type { ChallengeRecord, ChallengeStore, IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import type { SessionService } from "../sessions/session-service.js";
 
 export type PasskeyRegistrationFinishConfig = {
   rpId: string;
@@ -32,6 +33,7 @@ export type VerifyRegistrationResponse = typeof verifyRegistrationResponse;
 export type PasskeyRegistrationFinishServiceOptions = {
   verifyRegistration?: VerifyRegistrationResponse;
   securityEvents?: SecurityEventService;
+  sessionService?: Pick<SessionService, "revoke">;
 };
 
 type RegistrationChallengePayload = {
@@ -93,6 +95,7 @@ function encodePublicKey(publicKey: Uint8Array): string {
 export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrationFinishService {
   private readonly verifyRegistration: VerifyRegistrationResponse;
   private readonly securityEvents: SecurityEventService | undefined;
+  private readonly sessionService: Pick<SessionService, "revoke"> | undefined;
 
   constructor(
     private readonly identityStore: Pick<
@@ -105,6 +108,7 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
   ) {
     this.verifyRegistration = options.verifyRegistration ?? verifyRegistrationResponse;
     this.securityEvents = options.securityEvents;
+    this.sessionService = options.sessionService;
   }
 
   async finish(input: FinishPasskeyRegistrationInput): Promise<FinishPasskeyRegistrationResult> {
@@ -154,6 +158,24 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
         signCount: verification.registrationInfo.credential.counter,
         deviceName: input.deviceName ?? null
       });
+      const recoverySessionId = resolveRecoverySessionId(payload.registrationContext);
+
+      if (recoverySessionId) {
+        await this.sessionService?.revoke(recoverySessionId);
+        await this.recordSecurityEvent({
+          userId,
+          actorUserId: userId,
+          sessionId: recoverySessionId,
+          eventType: "session_revoked",
+          outcome: "success",
+          metadata: {
+            credentialId,
+            reason: "recovery_passkey_registered",
+            registrationId: input.registrationId,
+            registrationContext: payload.registrationContext
+          }
+        });
+      }
 
       await this.recordSecurityEvent({
         userId,
@@ -162,6 +184,7 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
         metadata: {
           credentialId,
           deviceName: input.deviceName ?? null,
+          ...(recoverySessionId ? { recoverySessionFinalized: true } : {}),
           registrationContext: payload.registrationContext,
           registrationId: input.registrationId
         }
@@ -204,4 +227,16 @@ function resolveRegistrationContext(record: ChallengeRecord): Record<string, unk
   }
 
   return { flow: "standard" };
+}
+
+function resolveRecoverySessionId(registrationContext: Record<string, unknown>): SessionId | null {
+  if (
+    registrationContext.flow === "recovery" &&
+    typeof registrationContext.recoverySessionId === "string" &&
+    registrationContext.recoverySessionId.length > 0
+  ) {
+    return registrationContext.recoverySessionId as SessionId;
+  }
+
+  return null;
 }
