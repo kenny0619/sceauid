@@ -36,6 +36,7 @@ export type PasskeyRegistrationFinishServiceOptions = {
 
 type RegistrationChallengePayload = {
   challenge: string;
+  registrationContext: Record<string, unknown>;
   userHandle: string;
   rpId: string;
   origin: string;
@@ -65,6 +66,12 @@ function resolveChallengePayload(record: ChallengeRecord): RegistrationChallenge
 
   return {
     challenge: payload.challenge,
+    registrationContext:
+      payload.registrationContext &&
+      typeof payload.registrationContext === "object" &&
+      !Array.isArray(payload.registrationContext)
+        ? (payload.registrationContext as Record<string, unknown>)
+        : { flow: "standard" },
     userHandle: payload.userHandle,
     rpId: payload.rpId,
     origin: payload.origin
@@ -102,9 +109,10 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
 
   async finish(input: FinishPasskeyRegistrationInput): Promise<FinishPasskeyRegistrationResult> {
     let auditUserId: UserId | null = null;
+    let challenge: ChallengeRecord | null = null;
 
     try {
-      const challenge = await this.challengeStore.consumeChallenge(
+      challenge = await this.challengeStore.consumeChallenge(
         input.registrationId,
         "passkey_registration"
       );
@@ -154,6 +162,7 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
         metadata: {
           credentialId,
           deviceName: input.deviceName ?? null,
+          registrationContext: payload.registrationContext,
           registrationId: input.registrationId
         }
       });
@@ -166,6 +175,7 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
         outcome: "failure",
         riskLevel: "medium",
         metadata: {
+          ...(challenge ? { registrationContext: resolveRegistrationContext(challenge) } : {}),
           registrationId: input.registrationId,
           reason: error instanceof Error ? error.message : "unknown"
         }
@@ -180,4 +190,18 @@ export class DefaultPasskeyRegistrationFinishService implements PasskeyRegistrat
   ): Promise<void> {
     await this.securityEvents?.record(input).catch(() => undefined);
   }
+}
+
+function resolveRegistrationContext(record: ChallengeRecord): Record<string, unknown> {
+  const { registrationContext } = record.payload;
+
+  if (
+    registrationContext &&
+    typeof registrationContext === "object" &&
+    !Array.isArray(registrationContext)
+  ) {
+    return registrationContext as Record<string, unknown>;
+  }
+
+  return { flow: "standard" };
 }

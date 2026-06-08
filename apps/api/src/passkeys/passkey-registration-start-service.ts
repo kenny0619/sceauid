@@ -16,9 +16,15 @@ export type PasskeyRegistrationStartConfig = {
 };
 
 export type StartPasskeyRegistrationInput = {
+  context?: PasskeyRegistrationContext;
   userId: UserId;
   userName: string;
   userDisplayName?: string | null;
+};
+
+export type PasskeyRegistrationContext = {
+  flow?: "recovery" | "standard";
+  recoverySessionId?: string;
 };
 
 export type StartPasskeyRegistrationResult = {
@@ -127,6 +133,7 @@ export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrati
       subject: input.userId,
       payload: {
         challenge: options.challenge,
+        registrationContext: input.context ?? { flow: "standard" },
         userHandle: options.user.id,
         rpId: this.config.rpId,
         origin: this.config.origin
@@ -139,6 +146,7 @@ export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrati
       eventType: "passkey_registration_started",
       outcome: "pending",
       metadata: {
+        registrationContext: input.context ?? { flow: "standard" },
         registrationId,
         existingActivePasskeys: excludeActiveCredentials(passkeys).length
       }

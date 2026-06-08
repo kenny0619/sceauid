@@ -102,6 +102,9 @@ describe("DefaultPasskeyRegistrationFinishService integration", () => {
           metadata: {
             credentialId: "credential-id",
             deviceName: "MacBook",
+            registrationContext: {
+              flow: "standard"
+            },
             registrationId: "registration-id"
           }
         }

@@ -36,6 +36,10 @@ function createApp(
 ) {
   const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
   const registrationStarts: Array<{
+    context?: {
+      flow?: "recovery" | "standard";
+      recoverySessionId?: string;
+    };
     userDisplayName?: string | null;
     userId: UserId;
     userName: string;
@@ -398,6 +402,10 @@ describe("recovery routes", () => {
     expect(response.statusCode).toBe(200);
     expect(registrationStarts).toEqual([
       {
+        context: {
+          flow: "recovery",
+          recoverySessionId: recoverySession.id
+        },
         userId,
         userName: "ibukunoluwa@example.com",
         userDisplayName: "Ibukunoluwa Kehinde"

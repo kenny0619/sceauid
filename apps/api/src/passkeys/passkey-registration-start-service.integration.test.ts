@@ -85,6 +85,9 @@ describe("DefaultPasskeyRegistrationStartService integration", () => {
       subject: user.id,
       payload: {
         challenge: result.options.challenge,
+        registrationContext: {
+          flow: "standard"
+        },
         userHandle: result.options.user.id,
         rpId: "localhost",
         origin: "http://localhost:3000"
@@ -100,6 +103,9 @@ describe("DefaultPasskeyRegistrationStartService integration", () => {
           eventType: "passkey_registration_started",
           outcome: "pending",
           metadata: {
+            registrationContext: {
+              flow: "standard"
+            },
             registrationId: "registration-id",
             existingActivePasskeys: 1
           }

@@ -186,6 +186,9 @@ describe("DefaultPasskeyRegistrationStartService", () => {
         subject: userId,
         payload: {
           challenge: "public-challenge",
+          registrationContext: {
+            flow: "standard"
+          },
           userHandle: "dXNlci1pZA",
           rpId: "localhost",
           origin: "http://localhost:3000"
@@ -199,6 +202,9 @@ describe("DefaultPasskeyRegistrationStartService", () => {
         eventType: "passkey_registration_started",
         outcome: "pending",
         metadata: {
+          registrationContext: {
+            flow: "standard"
+          },
           registrationId: "registration-id",
           existingActivePasskeys: 1
         }

@@ -249,10 +249,46 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
         metadata: {
           credentialId: "credential-id",
           deviceName: "MacBook",
+          registrationContext: {
+            flow: "standard"
+          },
           registrationId: "registration-id"
         }
       }
     ]);
+  });
+
+  it("carries recovery registration context into audit metadata", async () => {
+    const { service, securityEvents } = createService({
+      challenge: createChallenge({
+        payload: {
+          challenge: "public-challenge",
+          userHandle: "dXNlci1pZA",
+          rpId: "localhost",
+          origin: "http://localhost:3000",
+          registrationContext: {
+            flow: "recovery",
+            recoverySessionId: "recovery-session-id"
+          }
+        }
+      })
+    });
+
+    await service.finish({
+      registrationId: "registration-id",
+      credential: createCredentialResponse(),
+      deviceName: "iPhone"
+    });
+
+    expect(securityEvents.records[0]).toMatchObject({
+      eventType: "passkey_registered",
+      metadata: {
+        registrationContext: {
+          flow: "recovery",
+          recoverySessionId: "recovery-session-id"
+        }
+      }
+    });
   });
 
   it("rejects missing challenges and failed verification", async () => {
@@ -277,6 +313,9 @@ describe("DefaultPasskeyRegistrationFinishService", () => {
         outcome: "failure",
         riskLevel: "medium",
         metadata: {
+          registrationContext: {
+            flow: "standard"
+          },
           registrationId: "registration-id",
           reason: "Passkey registration verification failed"
         }

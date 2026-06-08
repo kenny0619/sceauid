@@ -376,6 +376,8 @@ Response:
 
 The recovery session token must come from a completed recovery request. Product applications should pass `options` to the authenticator, then finish the ceremony with `POST /v1/passkeys/registration/finish`.
 
+Recovery-started registrations are tagged in passkey registration security events with recovery context, including the recovery session ID.
+
 ## Session List
 
 `GET /v1/sessions`
