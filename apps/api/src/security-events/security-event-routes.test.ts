@@ -326,6 +326,88 @@ describe("security event routes", () => {
     ]);
   });
 
+  it("lists recovery events with the recovery event type preset", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [
+        {
+          ...event,
+          eventType: "recovery_code_redeemed",
+          metadata: {
+            redeemedAt: "2026-06-01T12:01:00.000Z"
+          }
+        }
+      ],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/recovery/events?limit=25&outcome=success&riskLevel=medium",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls).toEqual([
+      {
+        userId,
+        input: {
+          cursor: undefined,
+          eventTypes: [
+            "passkey_registration_started",
+            "passkey_registered",
+            "passkey_registration_failed",
+            "session_revoked",
+            "recovery_codes_enrolled",
+            "recovery_code_redeemed",
+            "recovery_started",
+            "recovery_verified",
+            "recovery_completed",
+            "recovery_delayed"
+          ] satisfies SecurityEventType[],
+          outcomes: ["success"] satisfies SecurityEventOutcome[],
+          riskLevels: ["medium"] satisfies RiskLevel[],
+          limit: 25
+        }
+      }
+    ]);
+    expect(response.json()).toMatchObject({
+      events: [
+        {
+          eventType: "recovery_code_redeemed",
+          metadata: {
+            redeemedAt: "2026-06-01T12:01:00.000Z"
+          }
+        }
+      ],
+      nextCursor: null
+    });
+  });
+
+  it("rejects invalid recovery event query parameters", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/recovery/events?outcome=maybe",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_request",
+      message: "Query parameters did not match the recovery event list schema"
+    });
+  });
+
   it("rejects requests without a session cookie", async () => {
     const app = createApp({
       authenticatedSession: session,
