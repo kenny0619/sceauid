@@ -352,6 +352,30 @@ Only pending and unexpired recovery requests can be completed. Unknown requests 
 
 The recovery session token is short-lived and gives the product application a bounded handoff credential for the next recovery step, such as passkey re-enrollment.
 
+### Start Recovery Passkey Registration
+
+`POST /v1/recovery/passkeys/registration/start`
+
+```json
+{
+  "recoverySessionToken": "recovery_session_token",
+  "userName": "ibukunoluwa@example.com",
+  "userDisplayName": "Ibukunoluwa Kehinde"
+}
+```
+
+Response:
+
+```json
+{
+  "registrationId": "registration_123",
+  "expiresAt": "2026-06-01T12:05:00.000Z",
+  "options": {}
+}
+```
+
+The recovery session token must come from a completed recovery request. Product applications should pass `options` to the authenticator, then finish the ceremony with `POST /v1/passkeys/registration/finish`.
+
 ## Session List
 
 `GET /v1/sessions`
@@ -441,6 +465,7 @@ Current passkey route error codes:
 - `login_start_failed`
 - `login_finish_failed`
 - `unauthenticated`
+- `invalid_recovery_session`
 - `invalid_recovery_code`
 - `recovery_request_expired`
 - `recovery_request_not_found`
