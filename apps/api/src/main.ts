@@ -126,6 +126,8 @@ await registerSessionRoutes(app, {
 await registerRecoveryRoutes(app, {
   passkeyRegistrationStartService: registrationStartService,
   recoveryCodes,
+  riskStore: riskStore.store,
+  securityEvents,
   sessionCookieName: config.SESSION_COOKIE_NAME,
   sessionService
 });
