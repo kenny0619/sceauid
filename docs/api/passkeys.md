@@ -304,7 +304,7 @@ Response:
 }
 ```
 
-Redemption does not require an active session. The API normalizes and hashes the submitted code, atomically marks a matching unused code as used, and creates a short-lived pending recovery request. Invalid, already used, or unknown user/code pairs return `401` with `error: "invalid_recovery_code"`.
+Redemption does not require an active session. The API normalizes and hashes the submitted code, atomically marks a matching unused code as used, and creates a short-lived pending recovery request. Invalid, already used, or unknown user/code pairs return `401` with `error: "invalid_recovery_code"`. Too many redemption attempts for the same user return `429` with `error: "rate_limited"` before any recovery code is consumed.
 
 ### Recovery Request Status
 
@@ -497,6 +497,7 @@ Current events include:
 - `recovery_verified`
 - `recovery_completed`
 - `recovery_delayed`
+- `rate_limit_triggered`
 
 Passkey removal events include metadata for `passkeyId`, `deviceName`, `actorSessionId`, and `revokedAt`.
 
@@ -505,6 +506,8 @@ Session creation events include metadata for `loginId`, `credentialId`, `passkey
 Session revocation events include metadata for `reason`, `actorSessionId`, whether the revoked session was the actor's own session, and target session device/timing fields.
 
 Recovery code enrollment events include metadata for `codeCount` and `enrolledAt`. Recovery code redemption events include metadata for `redeemedAt` and use medium risk.
+
+Recovery redemption rate-limit events use `rate_limit_triggered` with metadata for `scope`, `limit`, `remaining`, `windowSeconds`, and `resetAt`.
 
 ### List Recovery Events
 
