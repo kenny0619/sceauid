@@ -31,7 +31,7 @@ function createApp(
     rejectCompletion?: "expired" | "not_found" | "not_pending";
     rejectRegistrationStart?: "not_active" | "not_found";
     rejectRecoveryRequestLookup?: boolean;
-    rejectRedemption?: boolean;
+    rejectRedemption?: "invalid" | "rate_limited" | boolean;
   } = {}
 ) {
   const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
@@ -120,8 +120,12 @@ function createApp(
       async redeem(input) {
         redeemedCodes.push(input);
 
-        if (options.rejectRedemption) {
+        if (options.rejectRedemption === true || options.rejectRedemption === "invalid") {
           throw new Error("Recovery code was invalid or already used");
+        }
+
+        if (options.rejectRedemption === "rate_limited") {
+          throw new Error("Recovery code redemption rate limit exceeded");
         }
 
         return {
@@ -264,7 +268,7 @@ describe("recovery routes", () => {
   });
 
   it("returns a generic error for invalid or used recovery codes", async () => {
-    const { app } = createApp({ rejectRedemption: true });
+    const { app } = createApp({ rejectRedemption: "invalid" });
 
     const response = await app.inject({
       method: "POST",
@@ -279,6 +283,25 @@ describe("recovery routes", () => {
     expect(response.json()).toEqual({
       error: "invalid_recovery_code",
       message: "Recovery code is invalid or already used"
+    });
+  });
+
+  it("returns rate limited when recovery code redemption attempts are exhausted", async () => {
+    const { app } = createApp({ rejectRedemption: "rate_limited" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/codes/redeem",
+      payload: {
+        code: "AAAAA-BBBBB-CCCCC-DDDDD",
+        userId
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.json()).toEqual({
+      error: "rate_limited",
+      message: "Too many recovery code redemption attempts"
     });
   });
 
