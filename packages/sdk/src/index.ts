@@ -193,6 +193,8 @@ export type ListSecurityEventsInput = {
   limit?: number;
 };
 
+export type ListRecoveryEventsInput = Omit<ListSecurityEventsInput, "eventTypes">;
+
 export type ListSecurityEventsResponse = {
   events: ListedSecurityEvent[];
   nextCursor: string | null;
@@ -360,6 +362,30 @@ export class SceauIDClient {
 
   async securityEvent(eventId: string): Promise<SecurityEventResponse> {
     return this.request(`/v1/security-events/${encodeURIComponent(eventId)}`);
+  }
+
+  async recoveryEvents(input: ListRecoveryEventsInput = {}): Promise<ListSecurityEventsResponse> {
+    const searchParams = new URLSearchParams();
+
+    if (input.limit !== undefined) {
+      searchParams.set("limit", String(input.limit));
+    }
+
+    if (input.cursor !== undefined) {
+      searchParams.set("cursor", input.cursor);
+    }
+
+    for (const outcome of input.outcomes ?? []) {
+      searchParams.append("outcome", outcome);
+    }
+
+    for (const riskLevel of input.riskLevels ?? []) {
+      searchParams.append("riskLevel", riskLevel);
+    }
+
+    const query = searchParams.toString();
+
+    return this.request(`/v1/recovery/events${query ? `?${query}` : ""}`);
   }
 
   async passkeys(): Promise<ListPasskeysResponse> {

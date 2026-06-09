@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type {
   RiskLevel,
@@ -84,6 +84,19 @@ const listSecurityEventsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional()
 });
 
+const recoveryEventTypes = [
+  "passkey_registration_started",
+  "passkey_registered",
+  "passkey_registration_failed",
+  "session_revoked",
+  "recovery_codes_enrolled",
+  "recovery_code_redeemed",
+  "recovery_started",
+  "recovery_verified",
+  "recovery_completed",
+  "recovery_delayed"
+] as const satisfies readonly SecurityEventType[];
+
 function serializeSecurityEvent(event: SecurityEvent) {
   return {
     id: event.id,
@@ -97,6 +110,34 @@ function serializeSecurityEvent(event: SecurityEvent) {
     context: event.context,
     createdAt: event.createdAt.toISOString()
   };
+}
+
+async function authenticateSecurityEventRequest(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: SecurityEventRoutesDependencies
+) {
+  const token = request.cookies[dependencies.sessionCookieName];
+
+  if (!token) {
+    void reply.status(401).send({
+      error: "unauthenticated",
+      message: "Session cookie was not found"
+    });
+    return null;
+  }
+
+  const session = await dependencies.sessionService.authenticate(token);
+
+  if (!session) {
+    void reply.status(401).send({
+      error: "unauthenticated",
+      message: "Session is invalid or expired"
+    });
+    return null;
+  }
+
+  return session;
 }
 
 export async function registerSecurityEventRoutes(
@@ -113,22 +154,9 @@ export async function registerSecurityEventRoutes(
       });
     }
 
-    const token = request.cookies[dependencies.sessionCookieName];
-
-    if (!token) {
-      return reply.status(401).send({
-        error: "unauthenticated",
-        message: "Session cookie was not found"
-      });
-    }
-
-    const session = await dependencies.sessionService.authenticate(token);
-
+    const session = await authenticateSecurityEventRequest(request, reply, dependencies);
     if (!session) {
-      return reply.status(401).send({
-        error: "unauthenticated",
-        message: "Session is invalid or expired"
-      });
+      return;
     }
 
     try {
@@ -156,25 +184,52 @@ export async function registerSecurityEventRoutes(
     }
   });
 
-  app.get<{ Params: SecurityEventRouteParams }>(
-    "/v1/security-events/:eventId",
-    async (request, reply) => {
-      const token = request.cookies[dependencies.sessionCookieName];
+  app.get("/v1/recovery/events", async (request, reply) => {
+    const query = listSecurityEventsQuerySchema.omit({ eventType: true }).safeParse(request.query);
 
-      if (!token) {
-        return reply.status(401).send({
-          error: "unauthenticated",
-          message: "Session cookie was not found"
+    if (!query.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Query parameters did not match the recovery event list schema"
+      });
+    }
+
+    const session = await authenticateSecurityEventRequest(request, reply, dependencies);
+    if (!session) {
+      return;
+    }
+
+    try {
+      const page = await dependencies.securityEvents.listForUser(session.userId, {
+        cursor: query.data.cursor,
+        eventTypes: [...recoveryEventTypes],
+        outcomes: query.data.outcome,
+        riskLevels: query.data.riskLevel,
+        limit: query.data.limit
+      });
+
+      return reply.send({
+        events: page.events.map(serializeSecurityEvent),
+        nextCursor: page.nextCursor ?? null
+      });
+    } catch (error) {
+      if (error instanceof InvalidSecurityEventCursorError) {
+        return reply.status(400).send({
+          error: "invalid_request",
+          message: "Security event cursor is invalid"
         });
       }
 
-      const session = await dependencies.sessionService.authenticate(token);
+      throw error;
+    }
+  });
 
+  app.get<{ Params: SecurityEventRouteParams }>(
+    "/v1/security-events/:eventId",
+    async (request, reply) => {
+      const session = await authenticateSecurityEventRequest(request, reply, dependencies);
       if (!session) {
-        return reply.status(401).send({
-          error: "unauthenticated",
-          message: "Session is invalid or expired"
-        });
+        return;
       }
 
       const event = await dependencies.securityEvents.findForUser(

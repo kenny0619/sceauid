@@ -493,6 +493,10 @@ Current events include:
 - `session_revoked`
 - `recovery_codes_enrolled`
 - `recovery_code_redeemed`
+- `recovery_started`
+- `recovery_verified`
+- `recovery_completed`
+- `recovery_delayed`
 
 Passkey removal events include metadata for `passkeyId`, `deviceName`, `actorSessionId`, and `revokedAt`.
 
@@ -501,6 +505,14 @@ Session creation events include metadata for `loginId`, `credentialId`, `passkey
 Session revocation events include metadata for `reason`, `actorSessionId`, whether the revoked session was the actor's own session, and target session device/timing fields.
 
 Recovery code enrollment events include metadata for `codeCount` and `enrolledAt`. Recovery code redemption events include metadata for `redeemedAt` and use medium risk.
+
+### List Recovery Events
+
+`GET /v1/recovery/events?limit=50&outcome=success&riskLevel=medium&cursor=next_page_token`
+
+Authenticated clients can fetch the current user's recovery-focused security timeline without manually selecting recovery event types.
+
+The response shape matches `GET /v1/security-events`. `limit`, `cursor`, `outcome`, and `riskLevel` use the same rules as the general security event list.
 
 ### List Security Events
 

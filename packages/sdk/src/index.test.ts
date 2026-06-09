@@ -321,6 +321,54 @@ describe("SceauIDClient", () => {
     ]);
   });
 
+  it("lists recovery events with credentials", async () => {
+    const { calls, fetch } = createFetchStub({
+      events: [
+        {
+          id: "event_123",
+          userId: "user_123",
+          actorUserId: "user_123",
+          sessionId: "recovery_session_123",
+          eventType: "recovery_code_redeemed",
+          outcome: "success",
+          riskLevel: "medium",
+          metadata: {
+            redeemedAt: "2026-06-04T12:00:00.000Z"
+          },
+          context: {},
+          createdAt: "2026-06-04T12:00:00.000Z"
+        }
+      ],
+      nextCursor: null
+    });
+    const client = new SceauIDClient({
+      baseUrl: "https://identity.example.com",
+      fetch
+    });
+
+    const result = await client.recoveryEvents({
+      cursor: "current-page-token",
+      outcomes: ["success"],
+      riskLevels: ["medium"],
+      limit: 10
+    });
+
+    expect(result.events[0]?.eventType).toBe("recovery_code_redeemed");
+    expect(calls).toEqual([
+      {
+        init: {
+          body: undefined,
+          credentials: "include",
+          headers: {
+            Accept: "application/json"
+          },
+          method: "GET"
+        },
+        url: "https://identity.example.com/v1/recovery/events?limit=10&cursor=current-page-token&outcome=success&riskLevel=medium"
+      }
+    ]);
+  });
+
   it("lists passkeys with credentials", async () => {
     const { calls, fetch } = createFetchStub({
       passkeys: [
