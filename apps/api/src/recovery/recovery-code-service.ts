@@ -7,6 +7,7 @@ import type {
   UserId
 } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import type { RiskStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import type { CreatedSession, SessionService } from "../sessions/session-service.js";
 
@@ -78,12 +79,21 @@ export type RecoveryCodeServiceOptions = {
   codeCount?: number;
   now?: () => Date;
   randomBytes?: (size: number) => Buffer;
+  redemptionRateLimit?: {
+    limit: number;
+    windowSeconds: number;
+  };
+  riskStore?: RiskStore;
   recoveryRequestTtlSeconds?: number;
   recoverySessionTtlSeconds?: number;
   securityEvents?: SecurityEventService;
 };
 
 const defaultCodeCount = 10;
+const defaultRedemptionRateLimit = {
+  limit: 5,
+  windowSeconds: 60 * 15
+};
 const defaultRecoveryRequestTtlSeconds = 60 * 15;
 const defaultRecoverySessionTtlSeconds = 60 * 15;
 const codeByteLength = 10;
@@ -107,8 +117,10 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   private readonly codeCount: number;
   private readonly now: () => Date;
   private readonly randomBytes: (size: number) => Buffer;
+  private readonly redemptionRateLimit: { limit: number; windowSeconds: number };
   private readonly recoveryRequestTtlSeconds: number;
   private readonly recoverySessionTtlSeconds: number;
+  private readonly riskStore: RiskStore | undefined;
   private readonly securityEvents: SecurityEventService | undefined;
 
   constructor(
@@ -128,10 +140,12 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     this.codeCount = options.codeCount ?? defaultCodeCount;
     this.now = options.now ?? (() => new Date());
     this.randomBytes = options.randomBytes ?? randomBytes;
+    this.redemptionRateLimit = options.redemptionRateLimit ?? defaultRedemptionRateLimit;
     this.recoveryRequestTtlSeconds =
       options.recoveryRequestTtlSeconds ?? defaultRecoveryRequestTtlSeconds;
     this.recoverySessionTtlSeconds =
       options.recoverySessionTtlSeconds ?? defaultRecoverySessionTtlSeconds;
+    this.riskStore = options.riskStore;
     this.securityEvents = options.securityEvents;
   }
 
@@ -234,6 +248,31 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
 
   async redeem(input: RedeemRecoveryCodeInput): Promise<RedeemRecoveryCodeResult> {
     const redeemedAt = this.now();
+    const rateLimit = await this.riskStore?.checkRateLimit(
+      `recovery-code-redemption:user:${input.userId}`,
+      this.redemptionRateLimit.limit,
+      this.redemptionRateLimit.windowSeconds
+    );
+
+    if (rateLimit && !rateLimit.allowed) {
+      await this.recordSecurityEvent({
+        userId: input.userId,
+        actorUserId: input.userId,
+        eventType: "rate_limit_triggered",
+        outcome: "failure",
+        riskLevel: "medium",
+        metadata: {
+          limit: rateLimit.limit,
+          remaining: rateLimit.remaining,
+          resetAt: rateLimit.resetAt.toISOString(),
+          scope: "recovery_code_redemption",
+          windowSeconds: this.redemptionRateLimit.windowSeconds
+        }
+      });
+
+      throw new Error("Recovery code redemption rate limit exceeded");
+    }
+
     const consumed = await this.store.consumeRecoveryCode(
       input.userId,
       hashRecoveryCode(input.code),

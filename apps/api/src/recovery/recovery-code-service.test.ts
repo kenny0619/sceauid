@@ -9,7 +9,8 @@ import type {
 import type {
   CreateRecoveryCodeInput,
   CreateRecoveryRequestInput,
-  IdentityStore
+  IdentityStore,
+  RiskStore
 } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import type { SessionService } from "../sessions/session-service.js";
@@ -33,7 +34,9 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   const markedUsed: Array<{ userId: UserId; usedAt: Date }> = [];
   const recordedEvents: Array<Parameters<SecurityEventService["record"]>[0]> = [];
   const createdSessions: Array<Parameters<SessionService["create"]>[0]> = [];
+  const rateLimitChecks: Array<{ key: string; limit: number; windowSeconds: number }> = [];
   let consumeRecoveryCodeResult = true;
+  let rateLimitAllowed = true;
   let recoveryRequest: RecoveryRequest | null = {
     id: recoveryRequestId,
     userId,
@@ -144,6 +147,19 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     }
   };
 
+  const riskStore: RiskStore = {
+    async checkRateLimit(key, limit, windowSeconds) {
+      rateLimitChecks.push({ key, limit, windowSeconds });
+
+      return {
+        allowed: rateLimitAllowed,
+        limit,
+        remaining: rateLimitAllowed ? limit - 1 : 0,
+        resetAt: new Date("2026-06-01T12:15:00.000Z")
+      };
+    }
+  };
+
   return {
     consumedCodes,
     createdCodes,
@@ -151,6 +167,9 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     createdSessions,
     markRecoveryCodeInvalid() {
       consumeRecoveryCodeResult = false;
+    },
+    markRateLimited() {
+      rateLimitAllowed = false;
     },
     markRecoveryRequestMissing() {
       recoveryRequest = null;
@@ -173,7 +192,9 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
       }
     },
     markedUsed,
+    rateLimitChecks,
     recordedEvents,
+    riskStore,
     securityEvents,
     sessionService,
     store
@@ -248,7 +269,9 @@ describe("DefaultRecoveryCodeService", () => {
     const {
       consumedCodes,
       createdRecoveryRequests,
+      rateLimitChecks,
       recordedEvents,
+      riskStore,
       securityEvents,
       sessionService,
       store
@@ -256,6 +279,7 @@ describe("DefaultRecoveryCodeService", () => {
     const service = new DefaultRecoveryCodeService(store, sessionService, {
       now: () => new Date("2026-06-01T12:00:00.000Z"),
       recoveryRequestTtlSeconds: 300,
+      riskStore,
       securityEvents
     });
 
@@ -273,6 +297,13 @@ describe("DefaultRecoveryCodeService", () => {
         codeHash: hashRecoveryCode("ABCD1234EF"),
         usedAt: new Date("2026-06-01T12:00:00.000Z"),
         userId
+      }
+    ]);
+    expect(rateLimitChecks).toEqual([
+      {
+        key: "recovery-code-redemption:user:user-id",
+        limit: 5,
+        windowSeconds: 900
       }
     ]);
     expect(createdRecoveryRequests).toEqual([
@@ -307,6 +338,58 @@ describe("DefaultRecoveryCodeService", () => {
       "Recovery code was invalid or already used"
     );
     expect(recordedEvents).toEqual([]);
+  });
+
+  it("rejects recovery code redemption when rate limited", async () => {
+    const {
+      consumedCodes,
+      markRateLimited,
+      rateLimitChecks,
+      recordedEvents,
+      riskStore,
+      securityEvents,
+      sessionService,
+      store
+    } = createFakeStore();
+    markRateLimited();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
+      now: () => new Date("2026-06-01T12:00:00.000Z"),
+      redemptionRateLimit: {
+        limit: 2,
+        windowSeconds: 60
+      },
+      riskStore,
+      securityEvents
+    });
+
+    await expect(service.redeem({ code: "AAAAA-BBBBB", userId })).rejects.toThrow(
+      "Recovery code redemption rate limit exceeded"
+    );
+
+    expect(consumedCodes).toEqual([]);
+    expect(rateLimitChecks).toEqual([
+      {
+        key: "recovery-code-redemption:user:user-id",
+        limit: 2,
+        windowSeconds: 60
+      }
+    ]);
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: userId,
+        eventType: "rate_limit_triggered",
+        metadata: {
+          limit: 2,
+          remaining: 0,
+          resetAt: "2026-06-01T12:15:00.000Z",
+          scope: "recovery_code_redemption",
+          windowSeconds: 60
+        },
+        outcome: "failure",
+        riskLevel: "medium",
+        userId
+      }
+    ]);
   });
 
   it("returns recovery request status", async () => {

@@ -115,6 +115,16 @@ export async function registerRecoveryRoutes(
         });
       }
 
+      if (
+        error instanceof Error &&
+        error.message === "Recovery code redemption rate limit exceeded"
+      ) {
+        return reply.status(429).send({
+          error: "rate_limited",
+          message: "Too many recovery code redemption attempts"
+        });
+      }
+
       throw error;
     }
   });
