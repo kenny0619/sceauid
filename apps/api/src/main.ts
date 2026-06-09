@@ -13,6 +13,7 @@ import { DefaultPasskeyRegistrationStartService } from "./passkeys/passkey-regis
 import { registerPasskeyRoutes } from "./passkeys/passkey-routes.js";
 import { DefaultRecoveryCodeService } from "./recovery/recovery-code-service.js";
 import { registerRecoveryRoutes } from "./recovery/recovery-routes.js";
+import { createRedisRiskStore } from "./risks/redis-risk-store.js";
 import { registerSecurityEventRoutes } from "./security-events/security-event-routes.js";
 import { DefaultSecurityEventService } from "./security-events/security-event-service.js";
 import { registerSessionRoutes } from "./sessions/session-routes.js";
@@ -22,9 +23,11 @@ const config = loadConfig();
 const databaseClient = createDatabaseClient(config);
 const identityStore = new PostgresIdentityStore(databaseClient.db);
 const challengeStore = await createRedisChallengeStore(config.REDIS_URL);
+const riskStore = await createRedisRiskStore(config.REDIS_URL);
 const sessionService = new DefaultSessionService(identityStore);
 const securityEvents = new DefaultSecurityEventService(identityStore);
 const recoveryCodes = new DefaultRecoveryCodeService(identityStore, sessionService, {
+  riskStore: riskStore.store,
   securityEvents
 });
 const loginStartService = new DefaultPasskeyLoginStartService(
@@ -83,6 +86,7 @@ const app = Fastify({
 
 app.addHook("onClose", async () => {
   await challengeStore.close();
+  await riskStore.close();
   await databaseClient.close();
 });
 
