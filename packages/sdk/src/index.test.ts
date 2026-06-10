@@ -115,6 +115,7 @@ describe("SceauIDClient", () => {
       },
       session: {
         id: "session_123",
+        kind: "standard",
         deviceLabel: "Safari on macOS",
         userAgent: "test-agent",
         expiresAt: "2026-07-04T12:00:00.000Z",
@@ -129,6 +130,7 @@ describe("SceauIDClient", () => {
     const result = await client.currentSession();
 
     expect(result.user.id).toBe("user_123");
+    expect(result.session.kind).toBe("standard");
     expect(calls).toEqual([
       {
         init: {
@@ -150,9 +152,20 @@ describe("SceauIDClient", () => {
         {
           id: "session_123",
           current: true,
+          kind: "standard",
           deviceLabel: "Safari on macOS",
           userAgent: "test-agent",
           expiresAt: "2026-07-04T12:00:00.000Z",
+          revokedAt: null,
+          createdAt: "2026-06-04T12:00:00.000Z"
+        },
+        {
+          id: "recovery_session_123",
+          current: false,
+          kind: "recovery",
+          deviceLabel: "Recovery session",
+          userAgent: null,
+          expiresAt: "2026-06-04T12:15:00.000Z",
           revokedAt: null,
           createdAt: "2026-06-04T12:00:00.000Z"
         }
@@ -165,7 +178,7 @@ describe("SceauIDClient", () => {
 
     const result = await client.sessions();
 
-    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions.map((session) => session.kind)).toEqual(["standard", "recovery"]);
     expect(calls).toEqual([
       {
         init: {

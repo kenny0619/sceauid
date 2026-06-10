@@ -147,6 +147,7 @@ export type CurrentSessionResponse = {
   };
   session: {
     id: string;
+    kind: "recovery" | "standard";
     deviceLabel: string | null;
     userAgent: string | null;
     expiresAt: string;
@@ -157,6 +158,7 @@ export type CurrentSessionResponse = {
 export type ListedSession = {
   id: string;
   current: boolean;
+  kind: "recovery" | "standard";
   deviceLabel: string | null;
   userAgent: string | null;
   expiresAt: string;
