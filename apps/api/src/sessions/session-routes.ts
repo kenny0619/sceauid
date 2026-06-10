@@ -22,6 +22,12 @@ type SessionRouteParams = {
   sessionId: string;
 };
 
+const recoverySessionDeviceLabel = "Recovery session";
+
+function sessionKind(session: Session): "recovery" | "standard" {
+  return session.deviceLabel === recoverySessionDeviceLabel ? "recovery" : "standard";
+}
+
 function clearSessionCookie(
   reply: {
     clearCookie(
@@ -46,6 +52,7 @@ function serializeSession(session: Session, currentSessionId: string) {
   return {
     id: session.id,
     current: session.id === currentSessionId,
+    kind: sessionKind(session),
     deviceLabel: session.deviceLabel,
     userAgent: session.userAgent,
     expiresAt: session.expiresAt.toISOString(),
@@ -149,6 +156,7 @@ export async function registerSessionRoutes(
       },
       session: {
         id: session.id,
+        kind: sessionKind(session),
         deviceLabel: session.deviceLabel,
         userAgent: session.userAgent,
         expiresAt: session.expiresAt.toISOString(),

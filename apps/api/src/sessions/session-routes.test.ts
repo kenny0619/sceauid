@@ -80,10 +80,18 @@ describe("session routes", () => {
       revokedAt: new Date("2026-06-03T12:00:00.000Z"),
       createdAt: new Date("2026-06-02T12:00:00.000Z")
     };
+    const recoverySession: Session = {
+      ...session,
+      id: "recovery-session-id" as SessionId,
+      deviceLabel: "Recovery session",
+      userAgent: null,
+      expiresAt: new Date("2026-06-01T12:16:00.000Z"),
+      createdAt: new Date("2026-06-01T12:01:00.000Z")
+    };
     const app = createApp({
       authenticatedSession: session,
       foundUser: user,
-      sessionsForUser: [session, otherSession]
+      sessionsForUser: [session, otherSession, recoverySession]
     });
 
     const response = await app.inject({
@@ -100,6 +108,7 @@ describe("session routes", () => {
         {
           id: "session-id",
           current: true,
+          kind: "standard",
           deviceLabel: "Safari on macOS",
           userAgent: "test-agent",
           expiresAt: "2026-07-01T12:00:00.000Z",
@@ -109,11 +118,22 @@ describe("session routes", () => {
         {
           id: "other-session-id",
           current: false,
+          kind: "standard",
           deviceLabel: "Chrome on Windows",
           userAgent: "other-agent",
           expiresAt: "2026-07-02T12:00:00.000Z",
           revokedAt: "2026-06-03T12:00:00.000Z",
           createdAt: "2026-06-02T12:00:00.000Z"
+        },
+        {
+          id: "recovery-session-id",
+          current: false,
+          kind: "recovery",
+          deviceLabel: "Recovery session",
+          userAgent: null,
+          expiresAt: "2026-06-01T12:16:00.000Z",
+          revokedAt: null,
+          createdAt: "2026-06-01T12:01:00.000Z"
         }
       ]
     });
@@ -183,6 +203,7 @@ describe("session routes", () => {
       },
       session: {
         id: "session-id",
+        kind: "standard",
         deviceLabel: "Safari on macOS",
         userAgent: "test-agent",
         expiresAt: "2026-07-01T12:00:00.000Z",
