@@ -191,6 +191,7 @@ Response:
   },
   "session": {
     "id": "session_123",
+    "kind": "standard",
     "deviceLabel": "Safari on macOS",
     "userAgent": "Mozilla/5.0",
     "expiresAt": "2026-07-04T12:00:00.000Z",
@@ -396,9 +397,20 @@ Response:
     {
       "id": "session_123",
       "current": true,
+      "kind": "standard",
       "deviceLabel": "Safari on macOS",
       "userAgent": "Mozilla/5.0",
       "expiresAt": "2026-07-04T12:00:00.000Z",
+      "revokedAt": null,
+      "createdAt": "2026-06-04T12:00:00.000Z"
+    },
+    {
+      "id": "recovery_session_123",
+      "current": false,
+      "kind": "recovery",
+      "deviceLabel": "Recovery session",
+      "userAgent": null,
+      "expiresAt": "2026-06-04T12:15:00.000Z",
       "revokedAt": null,
       "createdAt": "2026-06-04T12:00:00.000Z"
     }
@@ -406,7 +418,7 @@ Response:
 }
 ```
 
-The response does not expose token hashes or IP hashes.
+The response does not expose token hashes or IP hashes. Recovery sessions are short-lived handoff sessions and are marked with `kind: "recovery"`.
 
 ## Revoke A Session
 
