@@ -1,13 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { RecoveryRequestId, UserId } from "../domain/identity.js";
+import type { RiskStore } from "../domain/storage.js";
 import type { PasskeyRegistrationStartService } from "../passkeys/passkey-registration-start-service.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { RecoveryCodeService } from "./recovery-code-service.js";
 
 export type RecoveryRoutesDependencies = {
   passkeyRegistrationStartService: PasskeyRegistrationStartService;
   recoveryCodes: RecoveryCodeService;
+  riskStore?: RiskStore;
+  securityEvents?: Pick<SecurityEventService, "record">;
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
 };
@@ -28,6 +32,10 @@ const recoveryPasskeyRegistrationStartBodySchema = z.object({
 });
 
 const recoverySessionDeviceLabel = "Recovery session";
+const recoveryPasskeyRegistrationStartRateLimit = {
+  limit: 3,
+  windowSeconds: 60 * 15
+};
 
 async function authenticateRequest(
   request: { cookies: Record<string, string | undefined> },
@@ -221,6 +229,37 @@ export async function registerRecoveryRoutes(
     }
 
     try {
+      const rateLimit = await dependencies.riskStore?.checkRateLimit(
+        `recovery-passkey-registration-start:session:${recoverySession.id}`,
+        recoveryPasskeyRegistrationStartRateLimit.limit,
+        recoveryPasskeyRegistrationStartRateLimit.windowSeconds
+      );
+
+      if (rateLimit && !rateLimit.allowed) {
+        await dependencies.securityEvents
+          ?.record({
+            userId: recoverySession.userId,
+            actorUserId: recoverySession.userId,
+            sessionId: recoverySession.id,
+            eventType: "rate_limit_triggered",
+            outcome: "failure",
+            riskLevel: "medium",
+            metadata: {
+              limit: rateLimit.limit,
+              remaining: rateLimit.remaining,
+              resetAt: rateLimit.resetAt.toISOString(),
+              scope: "recovery_passkey_registration_start",
+              windowSeconds: recoveryPasskeyRegistrationStartRateLimit.windowSeconds
+            }
+          })
+          .catch(() => undefined);
+
+        return reply.status(429).send({
+          error: "rate_limited",
+          message: "Too many recovery passkey registration attempts"
+        });
+      }
+
       return reply.send(
         await dependencies.passkeyRegistrationStartService.start({
           context: {

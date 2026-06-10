@@ -2,6 +2,8 @@ import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type { RecoveryRequestId, Session, SessionId, UserId } from "../domain/identity.js";
+import type { RiskStore } from "../domain/storage.js";
+import type { SecurityEventService } from "../security-events/security-event-service.js";
 import { registerRecoveryRoutes } from "./recovery-routes.js";
 
 const userId = "user-id" as UserId;
@@ -32,9 +34,11 @@ function createApp(
     rejectRegistrationStart?: "not_active" | "not_found";
     rejectRecoveryRequestLookup?: boolean;
     rejectRedemption?: "invalid" | "rate_limited" | boolean;
+    startRateLimitAllowed?: boolean;
   } = {}
 ) {
   const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
+  const rateLimitChecks: Array<{ key: string; limit: number; windowSeconds: number }> = [];
   const registrationStarts: Array<{
     context?: {
       flow?: "recovery" | "standard";
@@ -44,9 +48,22 @@ function createApp(
     userId: UserId;
     userName: string;
   }> = [];
+  const recordedEvents: Array<Parameters<SecurityEventService["record"]>[0]> = [];
   const redeemedCodes: Array<{ code: string; userId: UserId }> = [];
   const statusUsers: UserId[] = [];
   const app = Fastify();
+  const riskStore: RiskStore = {
+    async checkRateLimit(key, limit, windowSeconds) {
+      rateLimitChecks.push({ key, limit, windowSeconds });
+
+      return {
+        allowed: options.startRateLimitAllowed ?? true,
+        limit,
+        remaining: options.startRateLimitAllowed === false ? 0 : limit - 1,
+        resetAt: new Date("2026-06-01T12:15:00.000Z")
+      };
+    }
+  };
 
   void app.register(cookie);
   void registerRecoveryRoutes(app, {
@@ -161,6 +178,13 @@ function createApp(
       }
     },
     sessionCookieName: "sceauid_session",
+    riskStore,
+    securityEvents: {
+      async record(input) {
+        recordedEvents.push(input);
+        return undefined as never;
+      }
+    },
     sessionService: {
       async authenticate(token) {
         if (token === "recovery-session-token") {
@@ -172,7 +196,15 @@ function createApp(
     }
   });
 
-  return { app, enrollments, redeemedCodes, registrationStarts, statusUsers };
+  return {
+    app,
+    enrollments,
+    rateLimitChecks,
+    recordedEvents,
+    redeemedCodes,
+    registrationStarts,
+    statusUsers
+  };
 }
 
 describe("recovery routes", () => {
@@ -410,7 +442,7 @@ describe("recovery routes", () => {
   });
 
   it("starts passkey registration with a recovery session", async () => {
-    const { app, registrationStarts } = createApp();
+    const { app, rateLimitChecks, recordedEvents, registrationStarts } = createApp();
 
     const response = await app.inject({
       method: "POST",
@@ -423,6 +455,14 @@ describe("recovery routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(rateLimitChecks).toEqual([
+      {
+        key: "recovery-passkey-registration-start:session:recovery-session-id",
+        limit: 3,
+        windowSeconds: 900
+      }
+    ]);
+    expect(recordedEvents).toEqual([]);
     expect(registrationStarts).toEqual([
       {
         context: {
@@ -451,6 +491,52 @@ describe("recovery routes", () => {
         }
       }
     });
+  });
+
+  it("rate limits recovery passkey registration starts by recovery session", async () => {
+    const { app, rateLimitChecks, recordedEvents, registrationStarts } = createApp({
+      startRateLimitAllowed: false
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/passkeys/registration/start",
+      payload: {
+        recoverySessionToken: "recovery-session-token",
+        userName: "ibukunoluwa@example.com"
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.json()).toEqual({
+      error: "rate_limited",
+      message: "Too many recovery passkey registration attempts"
+    });
+    expect(rateLimitChecks).toEqual([
+      {
+        key: "recovery-passkey-registration-start:session:recovery-session-id",
+        limit: 3,
+        windowSeconds: 900
+      }
+    ]);
+    expect(registrationStarts).toEqual([]);
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: userId,
+        eventType: "rate_limit_triggered",
+        metadata: {
+          limit: 3,
+          remaining: 0,
+          resetAt: "2026-06-01T12:15:00.000Z",
+          scope: "recovery_passkey_registration_start",
+          windowSeconds: 900
+        },
+        outcome: "failure",
+        riskLevel: "medium",
+        sessionId: recoverySession.id,
+        userId
+      }
+    ]);
   });
 
   it("rejects invalid recovery sessions for passkey registration", async () => {

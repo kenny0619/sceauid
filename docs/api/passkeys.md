@@ -378,6 +378,8 @@ The recovery session token must come from a completed recovery request. Product 
 
 Recovery-started registrations are tagged in passkey registration security events with recovery context, including the recovery session ID.
 
+Too many passkey registration starts for the same recovery session return `429` with `error: "rate_limited"` before a new ceremony is created. SceauID records the block as `rate_limit_triggered` with `scope: "recovery_passkey_registration_start"`.
+
 After a recovery-started passkey registration finishes successfully, SceauID revokes the short-lived recovery session and records the revocation reason as `recovery_passkey_registered`.
 
 ## Session List
