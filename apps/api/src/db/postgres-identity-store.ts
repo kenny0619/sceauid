@@ -155,7 +155,8 @@ export class PostgresIdentityStore implements IdentityStore {
         deviceLabel: input.deviceLabel ?? null,
         userAgent: input.userAgent ?? null,
         ipHash: input.ipHash ?? null,
-        expiresAt: input.expiresAt
+        expiresAt: input.expiresAt,
+        ...(input.authenticatedAt === undefined ? {} : { authenticatedAt: input.authenticatedAt })
       })
       .returning();
 

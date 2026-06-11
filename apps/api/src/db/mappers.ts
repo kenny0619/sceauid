@@ -86,6 +86,7 @@ export function mapSession(row: SessionRow): Session {
     ipHash: row.ipHash,
     expiresAt: row.expiresAt,
     revokedAt: row.revokedAt,
+    authenticatedAt: row.authenticatedAt,
     createdAt: row.createdAt
   };
 }

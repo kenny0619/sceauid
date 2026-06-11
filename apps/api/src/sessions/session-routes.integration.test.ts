@@ -52,7 +52,8 @@ describe("session routes integration", () => {
         name: "sceauid_session"
       },
       sessionService,
-      store: context.store
+      store: context.store,
+      now: () => now
     });
 
     const response = await app.inject({

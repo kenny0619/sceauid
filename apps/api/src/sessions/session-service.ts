@@ -78,7 +78,8 @@ export class DefaultSessionService implements SessionService {
       deviceLabel: input.deviceLabel ?? null,
       userAgent: input.context?.userAgent ?? null,
       ipHash: input.context?.ipHash ?? null,
-      expiresAt: resolveExpiresAt(now, ttlSeconds)
+      expiresAt: resolveExpiresAt(now, ttlSeconds),
+      authenticatedAt: now
     });
 
     return { session, token };

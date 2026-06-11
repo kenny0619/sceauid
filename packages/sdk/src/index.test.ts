@@ -157,6 +157,7 @@ describe("SceauIDClient", () => {
         deviceLabel: "Safari on macOS",
         userAgent: "test-agent",
         expiresAt: "2026-07-04T12:00:00.000Z",
+        authenticatedAt: "2026-06-04T11:55:00.000Z",
         createdAt: "2026-06-04T12:00:00.000Z"
       }
     });
@@ -195,6 +196,7 @@ describe("SceauIDClient", () => {
           userAgent: "test-agent",
           expiresAt: "2026-07-04T12:00:00.000Z",
           revokedAt: null,
+          authenticatedAt: "2026-06-04T11:55:00.000Z",
           createdAt: "2026-06-04T12:00:00.000Z"
         },
         {
@@ -205,6 +207,7 @@ describe("SceauIDClient", () => {
           userAgent: null,
           expiresAt: "2026-06-04T12:15:00.000Z",
           revokedAt: null,
+          authenticatedAt: "2026-06-04T12:00:00.000Z",
           createdAt: "2026-06-04T12:00:00.000Z"
         }
       ]

@@ -195,6 +195,7 @@ Response:
     "deviceLabel": "Safari on macOS",
     "userAgent": "Mozilla/5.0",
     "expiresAt": "2026-07-04T12:00:00.000Z",
+    "authenticatedAt": "2026-06-04T11:55:00.000Z",
     "createdAt": "2026-06-04T12:00:00.000Z"
   }
 }
@@ -234,6 +235,8 @@ The response does not expose credential public keys or other verifier material.
 
 Authenticated clients can revoke a passkey returned by `GET /v1/passkeys`.
 
+This endpoint requires recent authentication. Sessions outside the fresh-auth window return `403` with `error: "fresh_auth_required"`.
+
 Response:
 
 ```json
@@ -268,6 +271,8 @@ The status endpoint never returns code values.
 ### Enroll Recovery Codes
 
 `POST /v1/recovery/codes`
+
+Enrollment requires recent authentication. Sessions outside the fresh-auth window return `403` with `error: "fresh_auth_required"`.
 
 Response:
 
@@ -423,6 +428,7 @@ Response:
       "userAgent": "Mozilla/5.0",
       "expiresAt": "2026-07-04T12:00:00.000Z",
       "revokedAt": null,
+      "authenticatedAt": "2026-06-04T11:55:00.000Z",
       "createdAt": "2026-06-04T12:00:00.000Z"
     },
     {
@@ -433,6 +439,7 @@ Response:
       "userAgent": null,
       "expiresAt": "2026-06-04T12:15:00.000Z",
       "revokedAt": null,
+      "authenticatedAt": "2026-06-04T12:00:00.000Z",
       "createdAt": "2026-06-04T12:00:00.000Z"
     }
   ]
@@ -448,6 +455,8 @@ Recovery sessions are rejected by normal authenticated endpoints with `403` and 
 `DELETE /v1/sessions/:sessionId`
 
 Authenticated clients can revoke a session returned by `GET /v1/sessions`.
+
+Revoking another session requires recent authentication. Sessions outside the fresh-auth window return `403` with `error: "fresh_auth_required"`. Current-session logout through `DELETE /v1/sessions/current` remains available without a fresh-auth check so users can always end their own session.
 
 Response:
 
@@ -500,6 +509,7 @@ Client errors use a consistent JSON shape:
 Current passkey route error codes:
 
 - `invalid_request`
+- `fresh_auth_required`
 - `last_passkey_required`
 - `registration_start_failed`
 - `registration_finish_failed`

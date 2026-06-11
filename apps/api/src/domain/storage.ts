@@ -45,6 +45,7 @@ export type CreateSessionInput = {
   userAgent?: string | null;
   ipHash?: string | null;
   expiresAt: Date;
+  authenticatedAt?: Date;
 };
 
 export type CreateRecoveryCodeInput = {

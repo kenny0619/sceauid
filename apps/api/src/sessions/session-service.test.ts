@@ -29,7 +29,8 @@ function createFakeStore() {
         ...input,
         deviceLabel: input.deviceLabel ?? null,
         userAgent: input.userAgent ?? null,
-        ipHash: input.ipHash ?? null
+        ipHash: input.ipHash ?? null,
+        authenticatedAt: input.authenticatedAt ?? new Date("2026-06-01T12:00:00.000Z")
       };
 
       sessionsByTokenHash.set(input.tokenHash, session);
@@ -90,7 +91,8 @@ describe("DefaultSessionService", () => {
       deviceLabel: "Safari on macOS",
       userAgent: "test-agent",
       ipHash: "ip-hash",
-      expiresAt: new Date("2026-07-01T12:00:00.000Z")
+      expiresAt: new Date("2026-07-01T12:00:00.000Z"),
+      authenticatedAt: now
     });
   });
 

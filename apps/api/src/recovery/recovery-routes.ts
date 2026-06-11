@@ -4,6 +4,7 @@ import type { RecoveryRequestId, UserId } from "../domain/identity.js";
 import type { RiskStore } from "../domain/storage.js";
 import type { PasskeyRegistrationStartService } from "../passkeys/passkey-registration-start-service.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import { isFreshAuthentication, rejectFreshAuthRequired } from "../sessions/fresh-auth.js";
 import { isRecoverySession, sessionKind } from "../sessions/session-kind.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { RecoveryCodeService } from "./recovery-code-service.js";
@@ -15,6 +16,8 @@ export type RecoveryRoutesDependencies = {
   securityEvents?: Pick<SecurityEventService, "record">;
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
+  freshAuthWindowSeconds?: number;
+  now?: () => Date;
 };
 
 const redeemRecoveryCodeBodySchema = z.object({
@@ -39,11 +42,18 @@ const recoveryPasskeyRegistrationStartRateLimit = {
 
 async function authenticateRequest(
   request: { cookies: Record<string, string | undefined> },
-  dependencies: Pick<RecoveryRoutesDependencies, "sessionCookieName" | "sessionService">,
+  dependencies: Pick<
+    RecoveryRoutesDependencies,
+    "freshAuthWindowSeconds" | "sessionCookieName" | "sessionService"
+  >,
   reply: {
     status(statusCode: number): {
       send(payload: { error: string; message: string }): unknown;
     };
+  },
+  options: {
+    now: Date;
+    requireFreshAuth?: boolean;
   }
 ) {
   const token = request.cookies[dependencies.sessionCookieName];
@@ -74,6 +84,16 @@ async function authenticateRequest(
     return null;
   }
 
+  if (
+    options.requireFreshAuth &&
+    !isFreshAuthentication(session, options.now, {
+      windowSeconds: dependencies.freshAuthWindowSeconds
+    })
+  ) {
+    rejectFreshAuthRequired(reply);
+    return null;
+  }
+
   return session;
 }
 
@@ -81,8 +101,12 @@ export async function registerRecoveryRoutes(
   app: FastifyInstance,
   dependencies: RecoveryRoutesDependencies
 ): Promise<void> {
+  const now = dependencies.now ?? (() => new Date());
+
   app.get("/v1/recovery/status", async (request, reply) => {
-    const session = await authenticateRequest(request, dependencies, reply);
+    const session = await authenticateRequest(request, dependencies, reply, {
+      now: now()
+    });
 
     if (!session) {
       return;
@@ -92,7 +116,10 @@ export async function registerRecoveryRoutes(
   });
 
   app.post("/v1/recovery/codes", async (request, reply) => {
-    const session = await authenticateRequest(request, dependencies, reply);
+    const session = await authenticateRequest(request, dependencies, reply, {
+      now: now(),
+      requireFreshAuth: true
+    });
 
     if (!session) {
       return;

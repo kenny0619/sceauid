@@ -135,6 +135,7 @@ function createFakeSessionService() {
     ipHash: "ip-hash",
     expiresAt: new Date("2026-07-01T12:00:00.000Z"),
     revokedAt: null,
+    authenticatedAt: now,
     createdAt: now
   };
   const createdSession: CreatedSession = {

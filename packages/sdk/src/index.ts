@@ -174,6 +174,7 @@ export type CurrentSessionResponse = {
     deviceLabel: string | null;
     userAgent: string | null;
     expiresAt: string;
+    authenticatedAt: string;
     createdAt: string;
   };
 };
@@ -186,6 +187,7 @@ export type ListedSession = {
   userAgent: string | null;
   expiresAt: string;
   revokedAt: string | null;
+  authenticatedAt: string;
   createdAt: string;
 };
 

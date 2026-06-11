@@ -156,6 +156,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
         ipHash: input.context?.ipHash ?? null,
         expiresAt: new Date("2026-06-01T12:16:00.000Z"),
         revokedAt: null,
+        authenticatedAt: new Date("2026-06-01T12:01:00.000Z"),
         createdAt: new Date("2026-06-01T12:01:00.000Z")
       };
 
