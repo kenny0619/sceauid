@@ -2,6 +2,7 @@ import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import type { PasskeyCredentialId, SessionId, UserId } from "../domain/identity.js";
+import type { RiskStore } from "../domain/storage.js";
 import type { SessionToken } from "../sessions/session-token.js";
 import type { PasskeyLoginFinishService } from "./passkey-login-finish-service.js";
 import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
@@ -13,6 +14,7 @@ function createApp(services: {
   finish?: PasskeyRegistrationFinishService;
   loginFinish?: PasskeyLoginFinishService;
   loginStart?: PasskeyLoginStartService;
+  riskStore?: RiskStore;
   sessionCookie?: {
     name: string;
     sameSite?: "lax" | "none" | "strict";
@@ -43,9 +45,28 @@ function createApp(services: {
         throw new Error("Start service was not configured");
       }
     },
+    riskStore: services.riskStore,
     sessionCookie: services.sessionCookie
   });
   return app;
+}
+
+function createRiskStore(allowed: boolean) {
+  const checks: Array<{ key: string; limit: number; windowSeconds: number }> = [];
+  const riskStore: RiskStore = {
+    async checkRateLimit(key, limit, windowSeconds) {
+      checks.push({ key, limit, windowSeconds });
+
+      return {
+        allowed,
+        limit,
+        remaining: allowed ? limit - 1 : 0,
+        resetAt: new Date(Date.now() + 60_000)
+      };
+    }
+  };
+
+  return { checks, riskStore };
 }
 
 describe("passkey routes", () => {
@@ -100,6 +121,39 @@ describe("passkey routes", () => {
         userVerification: "preferred"
       }
     });
+  });
+
+  it("rate limits passkey login starts before creating a ceremony", async () => {
+    const { checks, riskStore } = createRiskStore(false);
+    const app = createApp({
+      loginStart: {
+        async start() {
+          throw new Error("Login start service should not be called");
+        }
+      },
+      riskStore
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/passkeys/login/start",
+      payload: {
+        userId: "user-id"
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBeDefined();
+    expect(response.json()).toMatchObject({
+      error: "rate_limited"
+    });
+    expect(checks).toEqual([
+      {
+        key: expect.stringMatching(/^passkey_login_start:ip:[A-Za-z0-9_-]+$/),
+        limit: 20,
+        windowSeconds: 60
+      }
+    ]);
   });
 
   it("maps login start domain errors to HTTP statuses", async () => {
@@ -362,6 +416,40 @@ describe("passkey routes", () => {
         pubKeyCredParams: []
       }
     });
+  });
+
+  it("rate limits passkey registration starts before creating a ceremony", async () => {
+    const { checks, riskStore } = createRiskStore(false);
+    const app = createApp({
+      riskStore,
+      start: {
+        async start() {
+          throw new Error("Registration start service should not be called");
+        }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/passkeys/registration/start",
+      payload: {
+        userId: "user-id",
+        userName: "test@example.com"
+      }
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBeDefined();
+    expect(response.json()).toMatchObject({
+      error: "rate_limited"
+    });
+    expect(checks).toEqual([
+      {
+        key: expect.stringMatching(/^passkey_registration_start:ip:[A-Za-z0-9_-]+$/),
+        limit: 10,
+        windowSeconds: 60
+      }
+    ]);
   });
 
   it("rejects invalid request bodies", async () => {
