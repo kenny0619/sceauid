@@ -28,6 +28,7 @@ export type SecurityEventType =
   | "recovery_started"
   | "recovery_verified"
   | "recovery_completed"
+  | "recovery_cancelled"
   | "recovery_delayed"
   | "rate_limit_triggered"
   | "suspicious_activity_flagged";

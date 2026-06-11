@@ -12,6 +12,7 @@ import type { SecurityEventService } from "../security-events/security-event-ser
 import type { CreatedSession, SessionService } from "../sessions/session-service.js";
 
 export type RecoveryCodeService = {
+  cancelRecoveryRequest(recoveryRequestId: RecoveryRequestId): Promise<CancelRecoveryRequestResult>;
   completeRecoveryRequest(
     recoveryRequestId: RecoveryRequestId
   ): Promise<CompleteRecoveryRequestResult>;
@@ -75,6 +76,15 @@ export type CompleteRecoveryRequestResult = {
   };
 };
 
+export type CancelRecoveryRequestResult = {
+  ok: true;
+  recoveryRequest: {
+    id: RecoveryRequestId;
+    cancelledAt: Date;
+    status: "cancelled";
+  };
+};
+
 export type RecoveryCodeServiceOptions = {
   codeCount?: number;
   now?: () => Date;
@@ -126,6 +136,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
   constructor(
     private readonly store: Pick<
       IdentityStore,
+      | "cancelActiveRecoveryRequest"
       | "completeActiveRecoveryRequest"
       | "consumeRecoveryCode"
       | "countUnusedRecoveryCodesForUser"
@@ -147,6 +158,53 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       options.recoverySessionTtlSeconds ?? defaultRecoverySessionTtlSeconds;
     this.riskStore = options.riskStore;
     this.securityEvents = options.securityEvents;
+  }
+
+  async cancelRecoveryRequest(
+    recoveryRequestId: RecoveryRequestId
+  ): Promise<CancelRecoveryRequestResult> {
+    const cancelledAt = this.now();
+    const cancelled = await this.store.cancelActiveRecoveryRequest(recoveryRequestId, cancelledAt);
+
+    if (!cancelled) {
+      const existingRequest = await this.store.findRecoveryRequestById(recoveryRequestId);
+
+      if (!existingRequest) {
+        throw new Error("Recovery request was not found");
+      }
+
+      if (existingRequest.status !== "pending") {
+        throw new Error("Recovery request is not pending");
+      }
+
+      if (existingRequest.expiresAt <= cancelledAt) {
+        throw new Error("Recovery request is expired");
+      }
+
+      throw new Error("Recovery request could not be cancelled");
+    }
+
+    await this.recordSecurityEvent({
+      userId: cancelled.userId,
+      actorUserId: cancelled.userId,
+      eventType: "recovery_cancelled",
+      outcome: "success",
+      riskLevel: cancelled.riskLevel,
+      metadata: {
+        cancelledAt: cancelledAt.toISOString(),
+        recoveryRequestId: cancelled.id,
+        scope: "recovery_request_cancellation"
+      }
+    });
+
+    return {
+      ok: true,
+      recoveryRequest: {
+        id: cancelled.id,
+        cancelledAt,
+        status: "cancelled"
+      }
+    };
   }
 
   async completeRecoveryRequest(
@@ -262,6 +320,7 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
         outcome: "failure",
         riskLevel: "medium",
         metadata: {
+          attemptedAt: redeemedAt.toISOString(),
           limit: rateLimit.limit,
           remaining: rateLimit.remaining,
           resetAt: rateLimit.resetAt.toISOString(),
@@ -280,6 +339,19 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
     );
 
     if (!consumed) {
+      await this.recordSecurityEvent({
+        userId: input.userId,
+        actorUserId: input.userId,
+        eventType: "recovery_code_redeemed",
+        outcome: "failure",
+        riskLevel: "medium",
+        metadata: {
+          attemptedAt: redeemedAt.toISOString(),
+          reason: "invalid_or_used",
+          scope: "recovery_code_redemption"
+        }
+      });
+
       throw new Error("Recovery code was invalid or already used");
     }
 
@@ -297,7 +369,8 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
       riskLevel: "medium",
       metadata: {
         recoveryRequestId: recoveryRequest.id,
-        redeemedAt: redeemedAt.toISOString()
+        redeemedAt: redeemedAt.toISOString(),
+        scope: "recovery_code_redemption"
       }
     });
 

@@ -50,6 +50,7 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
   const store: Pick<
     IdentityStore,
     | "completeActiveRecoveryRequest"
+    | "cancelActiveRecoveryRequest"
     | "consumeRecoveryCode"
     | "countUnusedRecoveryCodesForUser"
     | "createRecoveryRequest"
@@ -57,6 +58,24 @@ function createFakeStore(options: { unusedRecoveryCodeCount?: number } = {}) {
     | "findRecoveryRequestById"
     | "markUnusedRecoveryCodesUsed"
   > = {
+    async cancelActiveRecoveryRequest(requestId, cancelledAt) {
+      expect(requestId).toBe(recoveryRequestId);
+
+      if (
+        !recoveryRequest ||
+        recoveryRequest.status !== "pending" ||
+        recoveryRequest.expiresAt <= cancelledAt
+      ) {
+        return null;
+      }
+
+      recoveryRequest = {
+        ...recoveryRequest,
+        status: "cancelled"
+      };
+
+      return recoveryRequest;
+    },
     async completeActiveRecoveryRequest(requestId, completedAt) {
       expect(requestId).toBe(recoveryRequestId);
 
@@ -319,7 +338,8 @@ describe("DefaultRecoveryCodeService", () => {
         eventType: "recovery_code_redeemed",
         metadata: {
           recoveryRequestId,
-          redeemedAt: "2026-06-01T12:00:00.000Z"
+          redeemedAt: "2026-06-01T12:00:00.000Z",
+          scope: "recovery_code_redemption"
         },
         outcome: "success",
         riskLevel: "medium",
@@ -332,12 +352,28 @@ describe("DefaultRecoveryCodeService", () => {
     const { markRecoveryCodeInvalid, recordedEvents, securityEvents, sessionService, store } =
       createFakeStore();
     markRecoveryCodeInvalid();
-    const service = new DefaultRecoveryCodeService(store, sessionService, { securityEvents });
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
+      now: () => new Date("2026-06-01T12:00:00.000Z"),
+      securityEvents
+    });
 
     await expect(service.redeem({ code: "invalid-code", userId })).rejects.toThrow(
       "Recovery code was invalid or already used"
     );
-    expect(recordedEvents).toEqual([]);
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: userId,
+        eventType: "recovery_code_redeemed",
+        metadata: {
+          attemptedAt: "2026-06-01T12:00:00.000Z",
+          reason: "invalid_or_used",
+          scope: "recovery_code_redemption"
+        },
+        outcome: "failure",
+        riskLevel: "medium",
+        userId
+      }
+    ]);
   });
 
   it("rejects recovery code redemption when rate limited", async () => {
@@ -379,6 +415,7 @@ describe("DefaultRecoveryCodeService", () => {
         actorUserId: userId,
         eventType: "rate_limit_triggered",
         metadata: {
+          attemptedAt: "2026-06-01T12:00:00.000Z",
           limit: 2,
           remaining: 0,
           resetAt: "2026-06-01T12:15:00.000Z",
@@ -430,6 +467,59 @@ describe("DefaultRecoveryCodeService", () => {
 
     await expect(service.recoveryRequestStatus(recoveryRequestId)).rejects.toThrow(
       "Recovery request was not found"
+    );
+  });
+
+  it("cancels active recovery requests", async () => {
+    const { recordedEvents, securityEvents, sessionService, store } = createFakeStore();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
+      now: () => new Date("2026-06-01T12:02:00.000Z"),
+      securityEvents
+    });
+
+    await expect(service.cancelRecoveryRequest(recoveryRequestId)).resolves.toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequestId,
+        cancelledAt: new Date("2026-06-01T12:02:00.000Z"),
+        status: "cancelled"
+      }
+    });
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: userId,
+        eventType: "recovery_cancelled",
+        metadata: {
+          cancelledAt: "2026-06-01T12:02:00.000Z",
+          recoveryRequestId,
+          scope: "recovery_request_cancellation"
+        },
+        outcome: "success",
+        riskLevel: "medium",
+        userId
+      }
+    ]);
+  });
+
+  it("rejects expired recovery request cancellation", async () => {
+    const { markRecoveryRequestExpired, sessionService, store } = createFakeStore();
+    markRecoveryRequestExpired();
+    const service = new DefaultRecoveryCodeService(store, sessionService, {
+      now: () => new Date("2026-06-01T12:01:00.000Z")
+    });
+
+    await expect(service.cancelRecoveryRequest(recoveryRequestId)).rejects.toThrow(
+      "Recovery request is expired"
+    );
+  });
+
+  it("rejects non-pending recovery request cancellation", async () => {
+    const { markRecoveryRequestCompleted, sessionService, store } = createFakeStore();
+    markRecoveryRequestCompleted();
+    const service = new DefaultRecoveryCodeService(store, sessionService);
+
+    await expect(service.cancelRecoveryRequest(recoveryRequestId)).rejects.toThrow(
+      "Recovery request is not pending"
     );
   });
 

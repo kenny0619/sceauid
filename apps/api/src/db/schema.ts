@@ -46,6 +46,7 @@ export const securityEventType = pgEnum("security_event_type", [
   "recovery_started",
   "recovery_verified",
   "recovery_completed",
+  "recovery_cancelled",
   "recovery_delayed",
   "rate_limit_triggered",
   "suspicious_activity_flagged"

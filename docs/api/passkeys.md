@@ -327,6 +327,27 @@ Response:
 
 Pending requests are reported as `expired` and `active: false` after their expiry time. Unknown request IDs return `404` with `error: "recovery_request_not_found"`.
 
+### Cancel Recovery Request
+
+`DELETE /v1/recovery/requests/:recoveryRequestId`
+
+Pending and unexpired recovery requests can be cancelled before completion.
+
+Response:
+
+```json
+{
+  "ok": true,
+  "recoveryRequest": {
+    "id": "recovery_request_123",
+    "cancelledAt": "2026-06-01T12:02:00.000Z",
+    "status": "cancelled"
+  }
+}
+```
+
+Unknown requests return `404` with `error: "recovery_request_not_found"`. Expired requests return `409` with `error: "recovery_request_expired"`. Requests that are already completed, verified, cancelled, or otherwise no longer pending return `409` with `error: "recovery_request_not_pending"`.
+
 ### Complete Recovery Request
 
 `POST /v1/recovery/requests/:recoveryRequestId/complete`
@@ -420,6 +441,8 @@ Response:
 
 The response does not expose token hashes or IP hashes. Recovery sessions are short-lived handoff sessions and are marked with `kind: "recovery"`.
 
+Recovery sessions are rejected by normal authenticated endpoints with `403` and `error: "standard_session_required"`. They are only accepted by recovery handoff endpoints that explicitly ask for a recovery session token.
+
 ## Revoke A Session
 
 `DELETE /v1/sessions/:sessionId`
@@ -483,8 +506,10 @@ Current passkey route error codes:
 - `login_start_failed`
 - `login_finish_failed`
 - `unauthenticated`
+- `standard_session_required`
 - `invalid_recovery_session`
 - `invalid_recovery_code`
+- `rate_limited`
 - `recovery_request_expired`
 - `recovery_request_not_found`
 - `recovery_request_not_pending`
@@ -510,6 +535,7 @@ Current events include:
 - `recovery_started`
 - `recovery_verified`
 - `recovery_completed`
+- `recovery_cancelled`
 - `recovery_delayed`
 - `rate_limit_triggered`
 
@@ -522,6 +548,8 @@ Session revocation events include metadata for `reason`, `actorSessionId`, wheth
 Recovery code enrollment events include metadata for `codeCount` and `enrolledAt`. Recovery code redemption events include metadata for `redeemedAt` and use medium risk.
 
 Recovery redemption rate-limit events use `rate_limit_triggered` with metadata for `scope`, `limit`, `remaining`, `windowSeconds`, and `resetAt`.
+
+Failed recovery code redemption attempts record `recovery_code_redeemed` with `outcome: "failure"` and metadata for `scope`, `reason`, and `attemptedAt`. Invalid recovery session use during passkey re-enrollment records `suspicious_activity_flagged` with recovery scope metadata.
 
 ### List Recovery Events
 

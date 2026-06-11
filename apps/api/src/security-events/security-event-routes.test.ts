@@ -27,6 +27,13 @@ const session: Session = {
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
+const recoverySession: Session = {
+  ...session,
+  id: "recovery-session-id" as SessionId,
+  deviceLabel: "Recovery session",
+  expiresAt: new Date("2026-06-01T12:16:00.000Z")
+};
+
 const event: SecurityEvent = {
   id: "event-id" as SecurityEventId,
   userId,
@@ -366,6 +373,7 @@ describe("security event routes", () => {
             "recovery_started",
             "recovery_verified",
             "recovery_completed",
+            "recovery_cancelled",
             "recovery_delayed"
           ] satisfies SecurityEventType[],
           outcomes: ["success"] satisfies SecurityEventOutcome[],
@@ -444,6 +452,48 @@ describe("security event routes", () => {
     expect(response.json()).toEqual({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+  });
+
+  it("rejects security event list requests with a recovery session", async () => {
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      events: [event]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
+    });
+  });
+
+  it("rejects recovery event list requests with a recovery session", async () => {
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      events: [event]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/recovery/events",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
   });
 

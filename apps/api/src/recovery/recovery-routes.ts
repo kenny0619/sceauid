@@ -4,6 +4,7 @@ import type { RecoveryRequestId, UserId } from "../domain/identity.js";
 import type { RiskStore } from "../domain/storage.js";
 import type { PasskeyRegistrationStartService } from "../passkeys/passkey-registration-start-service.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import { isRecoverySession, sessionKind } from "../sessions/session-kind.js";
 import type { SessionService } from "../sessions/session-service.js";
 import type { RecoveryCodeService } from "./recovery-code-service.js";
 
@@ -31,7 +32,6 @@ const recoveryPasskeyRegistrationStartBodySchema = z.object({
   userDisplayName: z.string().min(1).nullable().optional()
 });
 
-const recoverySessionDeviceLabel = "Recovery session";
 const recoveryPasskeyRegistrationStartRateLimit = {
   limit: 3,
   windowSeconds: 60 * 15
@@ -62,6 +62,14 @@ async function authenticateRequest(
     reply.status(401).send({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+    return null;
+  }
+
+  if (isRecoverySession(session)) {
+    reply.status(403).send({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
     return null;
   }
@@ -207,6 +215,48 @@ export async function registerRecoveryRoutes(
     }
   });
 
+  app.delete("/v1/recovery/requests/:recoveryRequestId", async (request, reply) => {
+    const params = recoveryRequestParamsSchema.safeParse(request.params);
+
+    if (!params.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        message: "Recovery request cancellation is invalid"
+      });
+    }
+
+    try {
+      return reply.send(
+        await dependencies.recoveryCodes.cancelRecoveryRequest(
+          params.data.recoveryRequestId as RecoveryRequestId
+        )
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "Recovery request was not found") {
+        return reply.status(404).send({
+          error: "recovery_request_not_found",
+          message: "Recovery request was not found"
+        });
+      }
+
+      if (error instanceof Error && error.message === "Recovery request is expired") {
+        return reply.status(409).send({
+          error: "recovery_request_expired",
+          message: "Recovery request is expired"
+        });
+      }
+
+      if (error instanceof Error && error.message === "Recovery request is not pending") {
+        return reply.status(409).send({
+          error: "recovery_request_not_pending",
+          message: "Recovery request is not pending"
+        });
+      }
+
+      throw error;
+    }
+  });
+
   app.post("/v1/recovery/passkeys/registration/start", async (request, reply) => {
     const body = recoveryPasskeyRegistrationStartBodySchema.safeParse(request.body);
 
@@ -221,7 +271,23 @@ export async function registerRecoveryRoutes(
       body.data.recoverySessionToken
     );
 
-    if (!recoverySession || recoverySession.deviceLabel !== recoverySessionDeviceLabel) {
+    if (!recoverySession || !isRecoverySession(recoverySession)) {
+      await dependencies.securityEvents
+        ?.record({
+          userId: recoverySession?.userId ?? null,
+          actorUserId: recoverySession?.userId ?? null,
+          sessionId: recoverySession?.id ?? null,
+          eventType: "suspicious_activity_flagged",
+          outcome: "failure",
+          riskLevel: "medium",
+          metadata: {
+            reason: recoverySession ? "non_recovery_session" : "invalid_or_expired_session",
+            scope: "recovery_passkey_registration_start",
+            ...(recoverySession ? { sessionKind: sessionKind(recoverySession) } : {})
+          }
+        })
+        .catch(() => undefined);
+
       return reply.status(401).send({
         error: "invalid_recovery_session",
         message: "Recovery session is invalid or expired"
@@ -247,6 +313,7 @@ export async function registerRecoveryRoutes(
             metadata: {
               limit: rateLimit.limit,
               remaining: rateLimit.remaining,
+              recoverySessionId: recoverySession.id,
               resetAt: rateLimit.resetAt.toISOString(),
               scope: "recovery_passkey_registration_start",
               windowSeconds: recoveryPasskeyRegistrationStartRateLimit.windowSeconds
