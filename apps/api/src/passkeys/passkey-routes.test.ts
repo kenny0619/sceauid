@@ -69,12 +69,23 @@ function createRiskStore(allowed: boolean) {
   return { checks, riskStore };
 }
 
+function expectAuditContext(userAgent?: string): unknown {
+  return expect.objectContaining({
+    ipHash: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    traceId: expect.any(String),
+    ...(userAgent ? { userAgent } : {})
+  });
+}
+
 describe("passkey routes", () => {
   it("starts passkey login", async () => {
     const app = createApp({
       loginStart: {
         async start(input) {
-          expect(input).toEqual({ userId: "user-id" });
+          expect(input).toEqual({
+            context: expectAuditContext(),
+            userId: "user-id"
+          });
 
           return {
             loginId: "login-id",
@@ -213,9 +224,7 @@ describe("passkey routes", () => {
               type: "public-key"
             },
             deviceLabel: "Safari on macOS",
-            context: {
-              userAgent: "test-agent"
-            }
+            context: expectAuditContext("test-agent")
           });
 
           return {
@@ -362,6 +371,7 @@ describe("passkey routes", () => {
       start: {
         async start(input) {
           expect(input).toEqual({
+            auditContext: expectAuditContext(),
             userId: "user-id",
             userName: "test@example.com",
             userDisplayName: "Test User"

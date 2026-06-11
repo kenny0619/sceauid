@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { UserId } from "../domain/identity.js";
 import type { RiskStore } from "../domain/storage.js";
 import { type RateLimitPolicy, createRateLimitGuard } from "../http/rate-limit-guard.js";
+import { resolveRequestAuditContext } from "../http/request-audit-context.js";
 import { type SessionCookieOptions, setSessionCookie } from "../http/session-cookie.js";
 import type { PasskeyLoginFinishService } from "./passkey-login-finish-service.js";
 import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
@@ -223,6 +224,7 @@ export async function registerPasskeyRoutes(
 
       try {
         const result = await dependencies.loginStartService.start({
+          context: resolveRequestAuditContext(request),
           userId: body.data?.userId as UserId | undefined
         });
 
@@ -261,11 +263,7 @@ export async function registerPasskeyRoutes(
         loginId: body.data.loginId,
         credential: body.data.credential,
         deviceLabel: body.data.deviceLabel,
-        context: {
-          ...(typeof request.headers["user-agent"] === "string"
-            ? { userAgent: request.headers["user-agent"] }
-            : {})
-        }
+        context: resolveRequestAuditContext(request)
       });
       if (dependencies.sessionCookie) {
         setSessionCookie(
@@ -321,6 +319,7 @@ export async function registerPasskeyRoutes(
 
       try {
         const result = await dependencies.registrationStartService.start({
+          auditContext: resolveRequestAuditContext(request),
           userId: body.data.userId as UserId,
           userName: body.data.userName,
           userDisplayName: body.data.userDisplayName
