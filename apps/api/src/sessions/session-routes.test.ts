@@ -25,6 +25,14 @@ const session: Session = {
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
+const recoverySession: Session = {
+  ...session,
+  id: "recovery-session-id" as SessionId,
+  deviceLabel: "Recovery session",
+  expiresAt: new Date("2026-06-01T12:16:00.000Z"),
+  createdAt: new Date("2026-06-01T12:01:00.000Z")
+};
+
 function createApp(options: {
   authenticatedSession?: Session | null;
   foundUser?: User | null;
@@ -80,18 +88,14 @@ describe("session routes", () => {
       revokedAt: new Date("2026-06-03T12:00:00.000Z"),
       createdAt: new Date("2026-06-02T12:00:00.000Z")
     };
-    const recoverySession: Session = {
-      ...session,
-      id: "recovery-session-id" as SessionId,
-      deviceLabel: "Recovery session",
-      userAgent: null,
-      expiresAt: new Date("2026-06-01T12:16:00.000Z"),
-      createdAt: new Date("2026-06-01T12:01:00.000Z")
+    const listedRecoverySession = {
+      ...recoverySession,
+      userAgent: null
     };
     const app = createApp({
       authenticatedSession: session,
       foundUser: user,
-      sessionsForUser: [session, otherSession, recoverySession]
+      sessionsForUser: [session, otherSession, listedRecoverySession]
     });
 
     const response = await app.inject({
@@ -180,6 +184,28 @@ describe("session routes", () => {
     });
   });
 
+  it("rejects session list requests with a recovery session", async () => {
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      foundUser: user,
+      sessionsForUser: [recoverySession]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sessions",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
+    });
+  });
+
   it("returns the current user and session for a valid session cookie", async () => {
     const app = createApp({
       authenticatedSession: session,
@@ -248,6 +274,27 @@ describe("session routes", () => {
     expect(response.json()).toEqual({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+  });
+
+  it("rejects current session lookups with a recovery session", async () => {
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      foundUser: user
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sessions/current",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
   });
 
@@ -356,6 +403,40 @@ describe("session routes", () => {
     expect(response.json()).toEqual({ ok: true });
     expect(revokedSessionIds).toEqual([]);
     expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
+  });
+
+  it("revokes a recovery session through current-session logout", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const securityEvents: RecordSecurityEventInput[] = [];
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      foundUser: user,
+      revokedSessionIds,
+      securityEvents
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/current",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    expect(revokedSessionIds).toEqual(["recovery-session-id"]);
+    expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
+    expect(securityEvents).toEqual([
+      expect.objectContaining({
+        sessionId: "recovery-session-id",
+        eventType: "session_revoked",
+        metadata: expect.objectContaining({
+          reason: "current_session_logout",
+          targetDeviceLabel: "Recovery session"
+        })
+      })
+    ]);
   });
 
   it("revokes another session owned by the authenticated user", async () => {
@@ -517,6 +598,31 @@ describe("session routes", () => {
     expect(response.json()).toEqual({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+    expect(revokedSessionIds).toEqual([]);
+  });
+
+  it("rejects targeted session revokes with a recovery session", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [recoverySession]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/session-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
     expect(revokedSessionIds).toEqual([]);
   });

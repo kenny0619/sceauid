@@ -25,6 +25,13 @@ const session: Session = {
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
+const recoverySession: Session = {
+  ...session,
+  id: "recovery-session-id" as SessionId,
+  deviceLabel: "Recovery session",
+  expiresAt: new Date("2026-06-01T12:16:00.000Z")
+};
+
 const passkey: PasskeyCredential = {
   id: "passkey-id" as PasskeyCredentialId,
   userId,
@@ -168,6 +175,27 @@ describe("passkey management routes", () => {
     expect(response.json()).toEqual({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+  });
+
+  it("rejects passkey list requests with a recovery session", async () => {
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      passkeys: [passkey]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/passkeys",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
   });
 
@@ -333,6 +361,30 @@ describe("passkey management routes", () => {
     expect(response.json()).toEqual({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+    expect(revokedCredentials).toEqual([]);
+  });
+
+  it("rejects passkey revoke requests with a recovery session", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: recoverySession,
+      passkeys: [passkey, backupPasskey],
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
     expect(revokedCredentials).toEqual([]);
   });

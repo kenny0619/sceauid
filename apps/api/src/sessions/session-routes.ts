@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Session, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import { isRecoverySession, sessionKind } from "./session-kind.js";
 import type { SessionService } from "./session-service.js";
 
 export type SessionCookieOptions = {
@@ -21,12 +22,6 @@ export type SessionRoutesDependencies = {
 type SessionRouteParams = {
   sessionId: string;
 };
-
-const recoverySessionDeviceLabel = "Recovery session";
-
-function sessionKind(session: Session): "recovery" | "standard" {
-  return session.deviceLabel === recoverySessionDeviceLabel ? "recovery" : "standard";
-}
 
 function clearSessionCookie(
   reply: {
@@ -90,6 +85,17 @@ async function recordSessionRevoked(
     .catch(() => undefined);
 }
 
+function rejectRecoverySession(reply: {
+  status(statusCode: number): {
+    send(payload: { error: string; message: string }): unknown;
+  };
+}) {
+  return reply.status(403).send({
+    error: "standard_session_required",
+    message: "Recovery sessions cannot access this endpoint"
+  });
+}
+
 export async function registerSessionRoutes(
   app: FastifyInstance,
   dependencies: SessionRoutesDependencies
@@ -111,6 +117,10 @@ export async function registerSessionRoutes(
         error: "unauthenticated",
         message: "Session is invalid or expired"
       });
+    }
+
+    if (isRecoverySession(currentSession)) {
+      return rejectRecoverySession(reply);
     }
 
     const sessions = await dependencies.sessionService.listForUser(currentSession.userId);
@@ -137,6 +147,10 @@ export async function registerSessionRoutes(
         error: "unauthenticated",
         message: "Session is invalid or expired"
       });
+    }
+
+    if (isRecoverySession(session)) {
+      return rejectRecoverySession(reply);
     }
 
     const user = await dependencies.store.findUserById(session.userId as UserId);
@@ -206,6 +220,10 @@ export async function registerSessionRoutes(
         error: "unauthenticated",
         message: "Session is invalid or expired"
       });
+    }
+
+    if (isRecoverySession(currentSession)) {
+      return rejectRecoverySession(reply);
     }
 
     const sessions = await dependencies.sessionService.listForUser(currentSession.userId);

@@ -7,6 +7,7 @@ import type {
   SecurityEventOutcome,
   SecurityEventType
 } from "../domain/identity.js";
+import { isRecoverySession } from "../sessions/session-kind.js";
 import type { SessionService } from "../sessions/session-service.js";
 import {
   InvalidSecurityEventCursorError,
@@ -40,6 +41,7 @@ const securityEventTypes = [
   "recovery_started",
   "recovery_verified",
   "recovery_completed",
+  "recovery_cancelled",
   "recovery_delayed",
   "rate_limit_triggered",
   "suspicious_activity_flagged"
@@ -94,6 +96,7 @@ const recoveryEventTypes = [
   "recovery_started",
   "recovery_verified",
   "recovery_completed",
+  "recovery_cancelled",
   "recovery_delayed"
 ] as const satisfies readonly SecurityEventType[];
 
@@ -133,6 +136,14 @@ async function authenticateSecurityEventRequest(
     void reply.status(401).send({
       error: "unauthenticated",
       message: "Session is invalid or expired"
+    });
+    return null;
+  }
+
+  if (isRecoverySession(session)) {
+    void reply.status(403).send({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
     });
     return null;
   }

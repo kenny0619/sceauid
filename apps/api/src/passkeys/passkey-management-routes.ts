@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { PasskeyCredential, SessionId, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import { isRecoverySession } from "../sessions/session-kind.js";
 import type { SessionService } from "../sessions/session-service.js";
 
 export type PasskeyManagementRoutesDependencies = {
@@ -58,6 +59,17 @@ function serializePasskey(credential: PasskeyCredential) {
   };
 }
 
+function rejectRecoverySession(reply: {
+  status(statusCode: number): {
+    send(payload: { error: string; message: string }): unknown;
+  };
+}) {
+  return reply.status(403).send({
+    error: "standard_session_required",
+    message: "Recovery sessions cannot access this endpoint"
+  });
+}
+
 export async function registerPasskeyManagementRoutes(
   app: FastifyInstance,
   dependencies: PasskeyManagementRoutesDependencies
@@ -81,6 +93,10 @@ export async function registerPasskeyManagementRoutes(
         error: "unauthenticated",
         message: "Session is invalid or expired"
       });
+    }
+
+    if (isRecoverySession(session)) {
+      return rejectRecoverySession(reply);
     }
 
     const passkeys = await dependencies.store.listPasskeysForUser(session.userId);
@@ -107,6 +123,10 @@ export async function registerPasskeyManagementRoutes(
         error: "unauthenticated",
         message: "Session is invalid or expired"
       });
+    }
+
+    if (isRecoverySession(session)) {
+      return rejectRecoverySession(reply);
     }
 
     const passkeys = await dependencies.store.listPasskeysForUser(session.userId);
