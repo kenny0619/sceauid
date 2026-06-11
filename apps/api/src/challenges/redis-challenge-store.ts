@@ -8,6 +8,7 @@ export type RedisChallengeStoreClient = {
     options: { expiration: { type: "EX"; value: number } }
   ): Promise<unknown>;
   getDel(key: string): Promise<string | null>;
+  ping?(): Promise<string>;
 };
 
 export type RedisChallengeStoreOptions = {
@@ -109,6 +110,7 @@ export async function createRedisChallengeStore(
   options: RedisChallengeStoreOptions = {}
 ): Promise<{
   store: RedisChallengeStore;
+  check(): Promise<void>;
   close(): Promise<void>;
 }> {
   const client = createClient({ url });
@@ -116,6 +118,9 @@ export async function createRedisChallengeStore(
 
   return {
     store: new RedisChallengeStore(client, options),
+    async check() {
+      await client.ping();
+    },
     async close() {
       await client.close();
     }

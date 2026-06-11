@@ -52,6 +52,7 @@ docs/
   api/
   sdk/
   architecture/
+  operations/
   security/
   adr/
 ```
@@ -64,6 +65,7 @@ docs/
 - [Fastify integration](docs/sdk/fastify.md)
 - [NestJS integration](docs/sdk/nestjs.md)
 - [Next.js integration](docs/sdk/nextjs.md)
+- [Health and readiness](docs/operations/health.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
 - [Decision records](docs/adr/)
