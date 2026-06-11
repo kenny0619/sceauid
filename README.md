@@ -69,6 +69,7 @@ docs/
 - [CSRF origin guard](docs/operations/csrf-origin-guard.md)
 - [Health and readiness](docs/operations/health.md)
 - [Request correlation](docs/operations/request-correlation.md)
+- [Security headers](docs/operations/security-headers.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
 - [Decision records](docs/adr/)
