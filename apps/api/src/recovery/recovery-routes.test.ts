@@ -33,6 +33,13 @@ const staleSession: Session = {
   authenticatedAt: new Date("2026-06-01T12:49:59.000Z")
 };
 
+function expectAuditContext(): unknown {
+  return expect.objectContaining({
+    ipHash: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    traceId: expect.any(String)
+  });
+}
+
 function createApp(
   options: {
     authenticatedSession?: Session | null;
@@ -48,6 +55,7 @@ function createApp(
   const enrollments: Array<{ actorSessionId?: SessionId | null; userId: UserId }> = [];
   const rateLimitChecks: Array<{ key: string; limit: number; windowSeconds: number }> = [];
   const registrationStarts: Array<{
+    auditContext?: unknown;
     context?: {
       flow?: "recovery" | "standard";
       recoverySessionId?: string;
@@ -57,7 +65,7 @@ function createApp(
     userName: string;
   }> = [];
   const recordedEvents: Array<Parameters<SecurityEventService["record"]>[0]> = [];
-  const redeemedCodes: Array<{ code: string; userId: UserId }> = [];
+  const redeemedCodes: Array<{ code: string; context?: unknown; userId: UserId }> = [];
   const statusUsers: UserId[] = [];
   const app = Fastify();
   const riskStore: RiskStore = {
@@ -355,6 +363,7 @@ describe("recovery routes", () => {
     expect(redeemedCodes).toEqual([
       {
         code: "AAAAA-BBBBB-CCCCC-DDDDD",
+        context: expectAuditContext(),
         userId
       }
     ]);
@@ -616,6 +625,7 @@ describe("recovery routes", () => {
     expect(recordedEvents).toEqual([]);
     expect(registrationStarts).toEqual([
       {
+        auditContext: expectAuditContext(),
         context: {
           flow: "recovery",
           recoverySessionId: recoverySession.id
@@ -683,6 +693,7 @@ describe("recovery routes", () => {
           scope: "recovery_passkey_registration_start",
           windowSeconds: 900
         },
+        context: expectAuditContext(),
         outcome: "failure",
         riskLevel: "medium",
         sessionId: recoverySession.id,
@@ -716,6 +727,7 @@ describe("recovery routes", () => {
           reason: "invalid_or_expired_session",
           scope: "recovery_passkey_registration_start"
         },
+        context: expectAuditContext(),
         outcome: "failure",
         riskLevel: "medium",
         sessionId: null,
@@ -750,6 +762,7 @@ describe("recovery routes", () => {
           scope: "recovery_passkey_registration_start",
           sessionKind: "standard"
         },
+        context: expectAuditContext(),
         outcome: "failure",
         riskLevel: "medium",
         sessionId: session.id,

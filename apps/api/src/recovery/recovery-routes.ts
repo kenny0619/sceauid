@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { RecoveryRequestId, UserId } from "../domain/identity.js";
 import type { RiskStore } from "../domain/storage.js";
+import { resolveRequestAuditContext } from "../http/request-audit-context.js";
 import type { PasskeyRegistrationStartService } from "../passkeys/passkey-registration-start-service.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import { isFreshAuthentication, rejectFreshAuthRequired } from "../sessions/fresh-auth.js";
@@ -147,6 +148,7 @@ export async function registerRecoveryRoutes(
       return reply.send(
         await dependencies.recoveryCodes.redeem({
           code: body.data.code,
+          context: resolveRequestAuditContext(request),
           userId: body.data.userId as UserId
         })
       );
@@ -311,7 +313,8 @@ export async function registerRecoveryRoutes(
             reason: recoverySession ? "non_recovery_session" : "invalid_or_expired_session",
             scope: "recovery_passkey_registration_start",
             ...(recoverySession ? { sessionKind: sessionKind(recoverySession) } : {})
-          }
+          },
+          context: resolveRequestAuditContext(request)
         })
         .catch(() => undefined);
 
@@ -344,7 +347,8 @@ export async function registerRecoveryRoutes(
               resetAt: rateLimit.resetAt.toISOString(),
               scope: "recovery_passkey_registration_start",
               windowSeconds: recoveryPasskeyRegistrationStartRateLimit.windowSeconds
-            }
+            },
+            context: resolveRequestAuditContext(request)
           })
           .catch(() => undefined);
 
@@ -356,6 +360,7 @@ export async function registerRecoveryRoutes(
 
       return reply.send(
         await dependencies.passkeyRegistrationStartService.start({
+          auditContext: resolveRequestAuditContext(request),
           context: {
             flow: "recovery",
             recoverySessionId: recoverySession.id

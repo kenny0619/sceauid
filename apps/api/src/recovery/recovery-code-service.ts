@@ -3,6 +3,7 @@ import type {
   RecoveryRequest,
   RecoveryRequestId,
   RecoveryRequestStatus,
+  RequestContext,
   SessionId,
   UserId
 } from "../domain/identity.js";
@@ -40,6 +41,7 @@ export type RecoveryCodeStatus = {
 
 export type RedeemRecoveryCodeInput = {
   code: string;
+  context?: RequestContext;
   userId: UserId;
 };
 
@@ -326,7 +328,8 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
           resetAt: rateLimit.resetAt.toISOString(),
           scope: "recovery_code_redemption",
           windowSeconds: this.redemptionRateLimit.windowSeconds
-        }
+        },
+        ...(input.context ? { context: input.context } : {})
       });
 
       throw new Error("Recovery code redemption rate limit exceeded");
@@ -349,7 +352,8 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
           attemptedAt: redeemedAt.toISOString(),
           reason: "invalid_or_used",
           scope: "recovery_code_redemption"
-        }
+        },
+        ...(input.context ? { context: input.context } : {})
       });
 
       throw new Error("Recovery code was invalid or already used");
@@ -371,7 +375,8 @@ export class DefaultRecoveryCodeService implements RecoveryCodeService {
         recoveryRequestId: recoveryRequest.id,
         redeemedAt: redeemedAt.toISOString(),
         scope: "recovery_code_redemption"
-      }
+      },
+      ...(input.context ? { context: input.context } : {})
     });
 
     return {

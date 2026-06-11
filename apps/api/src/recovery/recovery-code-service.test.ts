@@ -302,8 +302,13 @@ describe("DefaultRecoveryCodeService", () => {
       riskStore,
       securityEvents
     });
+    const context = {
+      ipHash: "ip-hash",
+      traceId: "trace-id",
+      userAgent: "test-agent"
+    };
 
-    await expect(service.redeem({ code: "abcd-1234 ef", userId })).resolves.toEqual({
+    await expect(service.redeem({ code: "abcd-1234 ef", context, userId })).resolves.toEqual({
       ok: true,
       recoveryRequest: {
         id: recoveryRequestId,
@@ -344,6 +349,7 @@ describe("DefaultRecoveryCodeService", () => {
         },
         outcome: "success",
         riskLevel: "medium",
+        context,
         userId
       }
     ]);
@@ -357,8 +363,12 @@ describe("DefaultRecoveryCodeService", () => {
       now: () => new Date("2026-06-01T12:00:00.000Z"),
       securityEvents
     });
+    const context = {
+      ipHash: "ip-hash",
+      traceId: "trace-id"
+    };
 
-    await expect(service.redeem({ code: "invalid-code", userId })).rejects.toThrow(
+    await expect(service.redeem({ code: "invalid-code", context, userId })).rejects.toThrow(
       "Recovery code was invalid or already used"
     );
     expect(recordedEvents).toEqual([
@@ -372,6 +382,7 @@ describe("DefaultRecoveryCodeService", () => {
         },
         outcome: "failure",
         riskLevel: "medium",
+        context,
         userId
       }
     ]);
@@ -398,8 +409,12 @@ describe("DefaultRecoveryCodeService", () => {
       riskStore,
       securityEvents
     });
+    const context = {
+      ipHash: "ip-hash",
+      traceId: "trace-id"
+    };
 
-    await expect(service.redeem({ code: "AAAAA-BBBBB", userId })).rejects.toThrow(
+    await expect(service.redeem({ code: "AAAAA-BBBBB", context, userId })).rejects.toThrow(
       "Recovery code redemption rate limit exceeded"
     );
 
@@ -425,6 +440,7 @@ describe("DefaultRecoveryCodeService", () => {
         },
         outcome: "failure",
         riskLevel: "medium",
+        context,
         userId
       }
     ]);
