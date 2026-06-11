@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { UserId } from "../domain/identity.js";
+import type { RiskStore } from "../domain/storage.js";
+import { type RateLimitPolicy, createRateLimitGuard } from "../http/rate-limit-guard.js";
 import type { PasskeyLoginFinishService } from "./passkey-login-finish-service.js";
 import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
@@ -17,8 +19,13 @@ export type SessionCookieOptions = {
 export type PasskeyRoutesDependencies = {
   loginFinishService: PasskeyLoginFinishService;
   loginStartService: PasskeyLoginStartService;
+  rateLimit?: {
+    loginStart?: RateLimitPolicy;
+    registrationStart?: RateLimitPolicy;
+  };
   registrationFinishService: PasskeyRegistrationFinishService;
   registrationStartService: PasskeyRegistrationStartService;
+  riskStore?: RiskStore;
   sessionCookie?: SessionCookieOptions;
 };
 
@@ -82,6 +89,18 @@ const finishLoginBodySchema = z.object({
   }),
   deviceLabel: z.string().min(1).nullable().optional()
 });
+
+const defaultLoginStartRateLimit = {
+  keyPrefix: "passkey_login_start:ip",
+  limit: 20,
+  windowSeconds: 60
+} satisfies RateLimitPolicy;
+
+const defaultRegistrationStartRateLimit = {
+  keyPrefix: "passkey_registration_start:ip",
+  limit: 10,
+  windowSeconds: 60
+} satisfies RateLimitPolicy;
 
 function resolveRegistrationStartStatus(error: unknown): number {
   if (!(error instanceof Error)) {
@@ -212,39 +231,58 @@ export async function registerPasskeyRoutes(
   app: FastifyInstance,
   dependencies: PasskeyRoutesDependencies
 ): Promise<void> {
-  app.post("/v1/passkeys/login/start", async (request, reply) => {
-    const body = startLoginBodySchema.safeParse(request.body);
+  const loginStartRateLimitGuard = dependencies.riskStore
+    ? createRateLimitGuard({
+        policy: dependencies.rateLimit?.loginStart ?? defaultLoginStartRateLimit,
+        riskStore: dependencies.riskStore
+      })
+    : undefined;
+  const registrationStartRateLimitGuard = dependencies.riskStore
+    ? createRateLimitGuard({
+        policy: dependencies.rateLimit?.registrationStart ?? defaultRegistrationStartRateLimit,
+        riskStore: dependencies.riskStore
+      })
+    : undefined;
 
-    if (!body.success) {
-      return reply.status(400).send({
-        error: "invalid_request",
-        message: "Request body did not match the passkey login start schema"
-      });
-    }
+  app.post(
+    "/v1/passkeys/login/start",
+    {
+      ...(loginStartRateLimitGuard ? { preHandler: loginStartRateLimitGuard } : {})
+    },
+    async (request, reply) => {
+      const body = startLoginBodySchema.safeParse(request.body);
 
-    try {
-      const result = await dependencies.loginStartService.start({
-        userId: body.data?.userId as UserId | undefined
-      });
-
-      return reply.send({
-        loginId: result.loginId,
-        expiresAt: result.expiresAt.toISOString(),
-        options: result.options
-      });
-    } catch (error) {
-      const status = resolveLoginStartStatus(error);
-
-      if (status === 500) {
-        throw error;
+      if (!body.success) {
+        return reply.status(400).send({
+          error: "invalid_request",
+          message: "Request body did not match the passkey login start schema"
+        });
       }
 
-      return reply.status(status).send({
-        error: "login_start_failed",
-        message: error instanceof Error ? error.message : "Unable to start passkey login"
-      });
+      try {
+        const result = await dependencies.loginStartService.start({
+          userId: body.data?.userId as UserId | undefined
+        });
+
+        return reply.send({
+          loginId: result.loginId,
+          expiresAt: result.expiresAt.toISOString(),
+          options: result.options
+        });
+      } catch (error) {
+        const status = resolveLoginStartStatus(error);
+
+        if (status === 500) {
+          throw error;
+        }
+
+        return reply.status(status).send({
+          error: "login_start_failed",
+          message: error instanceof Error ? error.message : "Unable to start passkey login"
+        });
+      }
     }
-  });
+  );
 
   app.post("/v1/passkeys/login/finish", async (request, reply) => {
     const body = finishLoginBodySchema.safeParse(request.body);
@@ -302,41 +340,47 @@ export async function registerPasskeyRoutes(
     }
   });
 
-  app.post("/v1/passkeys/registration/start", async (request, reply) => {
-    const body = startRegistrationBodySchema.safeParse(request.body);
+  app.post(
+    "/v1/passkeys/registration/start",
+    {
+      ...(registrationStartRateLimitGuard ? { preHandler: registrationStartRateLimitGuard } : {})
+    },
+    async (request, reply) => {
+      const body = startRegistrationBodySchema.safeParse(request.body);
 
-    if (!body.success) {
-      return reply.status(400).send({
-        error: "invalid_request",
-        message: "Request body did not match the passkey registration start schema"
-      });
-    }
-
-    try {
-      const result = await dependencies.registrationStartService.start({
-        userId: body.data.userId as UserId,
-        userName: body.data.userName,
-        userDisplayName: body.data.userDisplayName
-      });
-
-      return reply.send({
-        registrationId: result.registrationId,
-        expiresAt: result.expiresAt.toISOString(),
-        options: result.options
-      });
-    } catch (error) {
-      const status = resolveRegistrationStartStatus(error);
-
-      if (status === 500) {
-        throw error;
+      if (!body.success) {
+        return reply.status(400).send({
+          error: "invalid_request",
+          message: "Request body did not match the passkey registration start schema"
+        });
       }
 
-      return reply.status(status).send({
-        error: "registration_start_failed",
-        message: error instanceof Error ? error.message : "Unable to start passkey registration"
-      });
+      try {
+        const result = await dependencies.registrationStartService.start({
+          userId: body.data.userId as UserId,
+          userName: body.data.userName,
+          userDisplayName: body.data.userDisplayName
+        });
+
+        return reply.send({
+          registrationId: result.registrationId,
+          expiresAt: result.expiresAt.toISOString(),
+          options: result.options
+        });
+      } catch (error) {
+        const status = resolveRegistrationStartStatus(error);
+
+        if (status === 500) {
+          throw error;
+        }
+
+        return reply.status(status).send({
+          error: "registration_start_failed",
+          message: error instanceof Error ? error.message : "Unable to start passkey registration"
+        });
+      }
     }
-  });
+  );
 
   app.post("/v1/passkeys/registration/finish", async (request, reply) => {
     const body = finishRegistrationBodySchema.safeParse(request.body);

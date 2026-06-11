@@ -112,6 +112,7 @@ await registerPasskeyRoutes(app, {
   loginStartService,
   registrationFinishService,
   registrationStartService,
+  riskStore: riskStore.store,
   sessionCookie: {
     name: config.SESSION_COOKIE_NAME,
     sameSite: "lax",
