@@ -150,7 +150,13 @@ describe("DefaultPasskeyLoginStartService", () => {
       ]
     });
 
-    const result = await service.start({ userId });
+    const context = {
+      ipHash: "ip-hash",
+      traceId: "trace-id",
+      userAgent: "test-agent"
+    };
+
+    const result = await service.start({ context, userId });
 
     expect(result).toMatchObject({
       loginId: "login-id",
@@ -192,7 +198,8 @@ describe("DefaultPasskeyLoginStartService", () => {
           loginId: "login-id",
           mode: "scoped",
           allowedCredentials: 1
-        }
+        },
+        context
       }
     ]);
   });

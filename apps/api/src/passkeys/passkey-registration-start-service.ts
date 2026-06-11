@@ -4,7 +4,7 @@ import {
   type Uint8Array_,
   generateRegistrationOptions
 } from "@simplewebauthn/server";
-import type { PasskeyCredential, User, UserId } from "../domain/identity.js";
+import type { PasskeyCredential, RequestContext, User, UserId } from "../domain/identity.js";
 import { isPasskeyActive } from "../domain/identity.js";
 import type { ChallengeStore, IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
@@ -16,6 +16,7 @@ export type PasskeyRegistrationStartConfig = {
 };
 
 export type StartPasskeyRegistrationInput = {
+  auditContext?: RequestContext;
   context?: PasskeyRegistrationContext;
   userId: UserId;
   userName: string;
@@ -149,7 +150,8 @@ export class DefaultPasskeyRegistrationStartService implements PasskeyRegistrati
         registrationContext: input.context ?? { flow: "standard" },
         registrationId,
         existingActivePasskeys: excludeActiveCredentials(passkeys).length
-      }
+      },
+      ...(input.auditContext ? { context: input.auditContext } : {})
     });
 
     return { registrationId, options, expiresAt };

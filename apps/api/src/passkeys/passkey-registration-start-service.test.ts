@@ -145,7 +145,14 @@ describe("DefaultPasskeyRegistrationStartService", () => {
       }
     );
 
+    const auditContext = {
+      ipHash: "ip-hash",
+      traceId: "trace-id",
+      userAgent: "test-agent"
+    };
+
     const result = await service.start({
+      auditContext,
       userId,
       userName: "test@example.com"
     });
@@ -207,7 +214,8 @@ describe("DefaultPasskeyRegistrationStartService", () => {
           },
           registrationId: "registration-id",
           existingActivePasskeys: 1
-        }
+        },
+        context: auditContext
       }
     ]);
   });

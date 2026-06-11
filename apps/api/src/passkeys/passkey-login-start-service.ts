@@ -3,7 +3,7 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
   generateAuthenticationOptions
 } from "@simplewebauthn/server";
-import type { PasskeyCredential, User, UserId } from "../domain/identity.js";
+import type { PasskeyCredential, RequestContext, User, UserId } from "../domain/identity.js";
 import { isPasskeyActive } from "../domain/identity.js";
 import type { ChallengeStore, IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
@@ -14,6 +14,7 @@ export type PasskeyLoginStartConfig = {
 };
 
 export type StartPasskeyLoginInput = {
+  context?: RequestContext;
   userId?: UserId;
 };
 
@@ -124,7 +125,8 @@ export class DefaultPasskeyLoginStartService implements PasskeyLoginStartService
         loginId,
         mode: input.userId ? "scoped" : "discoverable",
         allowedCredentials: allowCredentials?.length ?? null
-      }
+      },
+      ...(input.context ? { context: input.context } : {})
     });
 
     return { loginId, options, expiresAt };
