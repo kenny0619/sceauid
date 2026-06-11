@@ -5,6 +5,7 @@ export type RedisRiskStoreClient = {
   incr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<unknown>;
   ttl(key: string): Promise<number>;
+  ping?(): Promise<string>;
 };
 
 export type RedisRiskStoreOptions = {
@@ -65,6 +66,7 @@ export async function createRedisRiskStore(
   options: RedisRiskStoreOptions = {}
 ): Promise<{
   store: RedisRiskStore;
+  check(): Promise<void>;
   close(): Promise<void>;
 }> {
   const client = createClient({ url });
@@ -72,6 +74,9 @@ export async function createRedisRiskStore(
 
   return {
     store: new RedisRiskStore(client, options),
+    async check() {
+      await client.ping();
+    },
     async close() {
       await client.close();
     }

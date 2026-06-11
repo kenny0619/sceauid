@@ -5,6 +5,7 @@ import { createRedisChallengeStore } from "./challenges/redis-challenge-store.js
 import { loadConfig } from "./config.js";
 import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
+import { registerHealthRoutes } from "./health/health-routes.js";
 import { DefaultPasskeyLoginFinishService } from "./passkeys/passkey-login-finish-service.js";
 import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-service.js";
 import { registerPasskeyManagementRoutes } from "./passkeys/passkey-management-routes.js";
@@ -136,11 +137,22 @@ await registerSecurityEventRoutes(app, {
   sessionCookieName: config.SESSION_COOKIE_NAME,
   sessionService
 });
-
-app.get("/health", async () => ({
-  status: "ok",
-  service: "sceauid-api"
-}));
+await registerHealthRoutes(app, {
+  checks: [
+    {
+      name: "postgres",
+      check: () => databaseClient.check()
+    },
+    {
+      name: "redis:challenges",
+      check: () => challengeStore.check()
+    },
+    {
+      name: "redis:risk",
+      check: () => riskStore.check()
+    }
+  ]
+});
 
 app.get("/v1/meta", async () => ({
   name: "SceauID",

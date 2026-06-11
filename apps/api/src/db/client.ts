@@ -7,6 +7,7 @@ export type Database = PostgresJsDatabase<typeof schema>;
 
 export type DatabaseClient = {
   db: Database;
+  check(): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -19,6 +20,9 @@ export function createDatabaseClient(config: Pick<AppConfig, "DATABASE_URL">): D
 
   return {
     db: drizzle(client, { schema }),
+    async check() {
+      await client`select 1`;
+    },
     async close() {
       await client.end();
     }
