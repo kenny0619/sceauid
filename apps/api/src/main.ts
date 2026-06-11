@@ -86,7 +86,8 @@ const app = Fastify({
   logger: {
     level: config.NODE_ENV === "development" ? "info" : "warn"
   },
-  requestIdHeader: "x-request-id"
+  requestIdHeader: "x-request-id",
+  trustProxy: config.TRUST_PROXY
 });
 
 app.addHook("onClose", async () => {
