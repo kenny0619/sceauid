@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { SceauIDClient, SceauIDError, type SceauIDFetchInit } from "./index.js";
+import {
+  SceauIDBrowserClient,
+  SceauIDClient,
+  SceauIDError,
+  type SceauIDFetchInit,
+  type WebAuthnAuthenticationCredential,
+  type WebAuthnAuthenticationOptions,
+  type WebAuthnRegistrationCredential,
+  type WebAuthnRegistrationOptions
+} from "./index.js";
 
 type FetchCall = {
   init?: SceauIDFetchInit;
@@ -20,6 +29,35 @@ function createFetchStub(responseBody: unknown, options: { ok?: boolean; status?
   };
 
   return { calls, fetch };
+}
+
+function createFetchSequenceStub(
+  responses: Array<{ body: unknown; ok?: boolean; status?: number }>
+) {
+  const calls: FetchCall[] = [];
+
+  const fetch = async (url: string, init?: SceauIDFetchInit) => {
+    calls.push({ init, url });
+
+    const response = responses.shift();
+
+    if (!response) {
+      throw new Error(`Unexpected SDK fetch call to ${url}`);
+    }
+
+    return {
+      ok: response.ok ?? true,
+      status: response.status ?? 200,
+      json: async () => response.body
+    };
+  };
+
+  return { calls, fetch };
+}
+
+function expectJsonRequestBody(call: FetchCall, expectedBody: unknown) {
+  expect(call.init?.body).toBeTypeOf("string");
+  expect(JSON.parse(call.init?.body ?? "{}")).toEqual(expectedBody);
 }
 
 describe("SceauIDClient", () => {
@@ -688,6 +726,355 @@ describe("SceauIDClient", () => {
         url: "https://identity.example.com/v1/recovery/passkeys/registration/start"
       }
     ]);
+  });
+
+  it("registers a passkey through the browser ceremony", async () => {
+    const registrationOptions: WebAuthnRegistrationOptions = {
+      challenge: "registration_challenge",
+      pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+      rp: {
+        id: "identity.example.com",
+        name: "SceauID"
+      },
+      user: {
+        displayName: "Ibukunoluwa Kehinde",
+        id: "user_123",
+        name: "ibukunoluwa@example.com"
+      }
+    };
+    const registrationCredential: WebAuthnRegistrationCredential = {
+      authenticatorAttachment: "platform",
+      clientExtensionResults: {},
+      id: "credential_public_id",
+      rawId: "credential_raw_id",
+      response: {
+        attestationObject: "attestation_object",
+        clientDataJSON: "client_data_json",
+        transports: ["internal"]
+      },
+      type: "public-key"
+    };
+    const ceremonyCalls: unknown[] = [];
+    const { calls, fetch } = createFetchSequenceStub([
+      {
+        body: {
+          expiresAt: "2026-06-04T00:05:00.000Z",
+          options: registrationOptions,
+          registrationId: "registration_123"
+        }
+      },
+      {
+        body: {
+          credential: {
+            createdAt: "2026-06-04T00:01:00.000Z",
+            credentialId: "credential_public_id",
+            deviceName: "MacBook Pro",
+            id: "passkey_123"
+          },
+          userId: "user_123"
+        }
+      }
+    ]);
+    const client = new SceauIDBrowserClient({
+      baseUrl: "https://identity.example.com",
+      ceremonies: {
+        startRegistration: async (options) => {
+          ceremonyCalls.push(options);
+          return registrationCredential;
+        }
+      },
+      fetch
+    });
+
+    const result = await client.registerPasskey({
+      deviceName: "MacBook Pro",
+      useAutoRegister: true,
+      userDisplayName: "Ibukunoluwa Kehinde",
+      userId: "user_123",
+      userName: "ibukunoluwa@example.com"
+    });
+
+    expect(result.credential.deviceName).toBe("MacBook Pro");
+    expect(ceremonyCalls).toEqual([
+      {
+        optionsJSON: registrationOptions,
+        useAutoRegister: true
+      }
+    ]);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({
+      init: {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      },
+      url: "https://identity.example.com/v1/passkeys/registration/start"
+    });
+    expectJsonRequestBody(calls[0], {
+      userDisplayName: "Ibukunoluwa Kehinde",
+      userId: "user_123",
+      userName: "ibukunoluwa@example.com"
+    });
+    expect(calls[1]).toMatchObject({
+      init: {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      },
+      url: "https://identity.example.com/v1/passkeys/registration/finish"
+    });
+    expectJsonRequestBody(calls[1], {
+      credential: {
+        authenticatorAttachment: "platform",
+        clientExtensionResults: {},
+        id: "credential_public_id",
+        rawId: "credential_raw_id",
+        response: {
+          attestationObject: "attestation_object",
+          clientDataJSON: "client_data_json",
+          transports: ["internal"]
+        },
+        type: "public-key"
+      },
+      deviceName: "MacBook Pro",
+      registrationId: "registration_123"
+    });
+  });
+
+  it("logs in with a passkey through the browser ceremony", async () => {
+    const authenticationOptions: WebAuthnAuthenticationOptions = {
+      allowCredentials: [{ id: "credential_public_id", type: "public-key" }],
+      challenge: "login_challenge",
+      rpId: "identity.example.com"
+    };
+    const authenticationCredential: WebAuthnAuthenticationCredential = {
+      authenticatorAttachment: "platform",
+      clientExtensionResults: {},
+      id: "credential_public_id",
+      rawId: "credential_raw_id",
+      response: {
+        authenticatorData: "authenticator_data",
+        clientDataJSON: "client_data_json",
+        signature: "signature",
+        userHandle: "user_handle"
+      },
+      type: "public-key"
+    };
+    const ceremonyCalls: unknown[] = [];
+    const { calls, fetch } = createFetchSequenceStub([
+      {
+        body: {
+          expiresAt: "2026-06-04T00:05:00.000Z",
+          loginId: "login_123",
+          options: authenticationOptions
+        }
+      },
+      {
+        body: {
+          credential: {
+            credentialId: "credential_public_id",
+            id: "passkey_123",
+            lastUsedAt: "2026-06-04T00:01:00.000Z",
+            signCount: 9
+          },
+          session: {
+            expiresAt: "2026-06-05T00:00:00.000Z",
+            id: "session_123",
+            token: "session_token"
+          },
+          userId: "user_123"
+        }
+      }
+    ]);
+    const client = new SceauIDBrowserClient({
+      baseUrl: "https://identity.example.com",
+      ceremonies: {
+        startAuthentication: async (options) => {
+          ceremonyCalls.push(options);
+          return authenticationCredential;
+        }
+      },
+      fetch
+    });
+
+    const result = await client.loginWithPasskey({
+      deviceLabel: "Safari on macOS",
+      useBrowserAutofill: true,
+      userId: "user_123",
+      verifyBrowserAutofillInput: false
+    });
+
+    expect(result.session.token).toBe("session_token");
+    expect(ceremonyCalls).toEqual([
+      {
+        optionsJSON: authenticationOptions,
+        useBrowserAutofill: true,
+        verifyBrowserAutofillInput: false
+      }
+    ]);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({
+      init: {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      },
+      url: "https://identity.example.com/v1/passkeys/login/start"
+    });
+    expectJsonRequestBody(calls[0], {
+      userId: "user_123"
+    });
+    expect(calls[1]).toMatchObject({
+      init: {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      },
+      url: "https://identity.example.com/v1/passkeys/login/finish"
+    });
+    expectJsonRequestBody(calls[1], {
+      credential: {
+        authenticatorAttachment: "platform",
+        clientExtensionResults: {},
+        id: "credential_public_id",
+        rawId: "credential_raw_id",
+        response: {
+          authenticatorData: "authenticator_data",
+          clientDataJSON: "client_data_json",
+          signature: "signature",
+          userHandle: "user_handle"
+        },
+        type: "public-key"
+      },
+      deviceLabel: "Safari on macOS",
+      loginId: "login_123"
+    });
+  });
+
+  it("registers a recovery passkey through the browser ceremony", async () => {
+    const registrationOptions: WebAuthnRegistrationOptions = {
+      challenge: "recovery_registration_challenge",
+      pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+      rp: {
+        id: "identity.example.com",
+        name: "SceauID"
+      },
+      user: {
+        displayName: "Ibukunoluwa Kehinde",
+        id: "user_123",
+        name: "ibukunoluwa@example.com"
+      }
+    };
+    const registrationCredential: WebAuthnRegistrationCredential = {
+      clientExtensionResults: {},
+      id: "credential_public_id",
+      rawId: "credential_raw_id",
+      response: {
+        attestationObject: "attestation_object",
+        clientDataJSON: "client_data_json"
+      },
+      type: "public-key"
+    };
+    const ceremonyCalls: unknown[] = [];
+    const { calls, fetch } = createFetchSequenceStub([
+      {
+        body: {
+          expiresAt: "2026-06-04T00:05:00.000Z",
+          options: registrationOptions,
+          registrationId: "registration_123"
+        }
+      },
+      {
+        body: {
+          credential: {
+            createdAt: "2026-06-04T00:01:00.000Z",
+            credentialId: "credential_public_id",
+            deviceName: "iPhone",
+            id: "passkey_123"
+          },
+          userId: "user_123"
+        }
+      }
+    ]);
+    const client = new SceauIDBrowserClient({
+      baseUrl: "https://identity.example.com",
+      ceremonies: {
+        startRegistration: async (options) => {
+          ceremonyCalls.push(options);
+          return registrationCredential;
+        }
+      },
+      fetch
+    });
+
+    const result = await client.registerRecoveryPasskey({
+      deviceName: "iPhone",
+      recoverySessionToken: "recovery_session_token",
+      userDisplayName: "Ibukunoluwa Kehinde",
+      userName: "ibukunoluwa@example.com"
+    });
+
+    expect(result.credential.id).toBe("passkey_123");
+    expect(ceremonyCalls).toEqual([
+      {
+        optionsJSON: registrationOptions,
+        useAutoRegister: undefined
+      }
+    ]);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toMatchObject({
+      init: {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      },
+      url: "https://identity.example.com/v1/recovery/passkeys/registration/start"
+    });
+    expectJsonRequestBody(calls[0], {
+      recoverySessionToken: "recovery_session_token",
+      userDisplayName: "Ibukunoluwa Kehinde",
+      userName: "ibukunoluwa@example.com"
+    });
+    expect(calls[1]).toMatchObject({
+      init: {
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      },
+      url: "https://identity.example.com/v1/passkeys/registration/finish"
+    });
+    expectJsonRequestBody(calls[1], {
+      credential: {
+        clientExtensionResults: {},
+        id: "credential_public_id",
+        rawId: "credential_raw_id",
+        response: {
+          attestationObject: "attestation_object",
+          clientDataJSON: "client_data_json"
+        },
+        type: "public-key"
+      },
+      deviceName: "iPhone",
+      registrationId: "registration_123"
+    });
   });
 
   it("throws a structured SceauIDError for failed requests", async () => {
