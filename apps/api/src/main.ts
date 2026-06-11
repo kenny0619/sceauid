@@ -7,6 +7,7 @@ import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
 import { registerHealthRoutes } from "./health/health-routes.js";
 import { registerRequestContext } from "./http/request-context.js";
+import { registerTrustedOriginGuard } from "./http/trusted-origin-guard.js";
 import { DefaultPasskeyLoginFinishService } from "./passkeys/passkey-login-finish-service.js";
 import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-service.js";
 import { registerPasskeyManagementRoutes } from "./passkeys/passkey-management-routes.js";
@@ -100,6 +101,10 @@ await app.register(cors, {
 
 await app.register(cookie);
 await registerRequestContext(app);
+await registerTrustedOriginGuard(app, {
+  sessionCookieName: config.SESSION_COOKIE_NAME,
+  trustedOrigins: [config.APP_ORIGIN]
+});
 await registerPasskeyRoutes(app, {
   loginFinishService,
   loginStartService,
