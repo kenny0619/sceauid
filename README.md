@@ -57,6 +57,7 @@ docs/
 
 - [Passkey API](docs/api/passkeys.md)
 - [Browser SDK](docs/sdk/browser.md)
+- [NestJS integration](docs/sdk/nestjs.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
 - [Decision records](docs/adr/)
