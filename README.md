@@ -71,6 +71,7 @@ docs/
 - [Rate limits](docs/operations/rate-limits.md)
 - [Request correlation](docs/operations/request-correlation.md)
 - [Security headers](docs/operations/security-headers.md)
+- [Session cookies](docs/operations/session-cookies.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
 - [Decision records](docs/adr/)
