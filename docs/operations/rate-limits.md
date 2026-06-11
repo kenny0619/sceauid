@@ -11,6 +11,8 @@ SceauID uses Redis-backed fixed-window rate limits for sensitive unauthenticated
 
 The client IP is hashed before it is used as part of the Redis key. The stored key is only used for throttling and does not need to reveal the raw address.
 
+If SceauID runs behind a trusted reverse proxy, set `TRUST_PROXY=true` so IP-scoped limits use the forwarded client address instead of the proxy address. Keep it disabled when clients can set forwarded headers directly.
+
 ## Responses
 
 When a request is accepted, SceauID includes rate-limit headers:

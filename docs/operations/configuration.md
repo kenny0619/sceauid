@@ -29,11 +29,20 @@ DATABASE_URL=postgres://sceauid:secret@db.internal:5432/sceauid
 REDIS_URL=redis://redis.internal:6379
 SESSION_COOKIE_NAME=sceauid_session
 APP_ORIGIN=https://app.example.com
+TRUST_PROXY=false
 WEBAUTHN_RP_NAME=SceauID
 WEBAUTHN_RP_ID=app.example.com
 ```
 
 `SESSION_COOKIE_NAME` and `WEBAUTHN_RP_NAME` still have defaults in production, but deployments can override them to match their application boundary and brand.
+
+## Reverse Proxies
+
+Set `TRUST_PROXY=true` only when SceauID runs behind a trusted reverse proxy or platform load balancer that sets forwarded client headers.
+
+When enabled, Fastify uses forwarded address headers to resolve `request.ip`. This matters for IP-scoped controls such as passkey ceremony rate limits.
+
+Leave `TRUST_PROXY=false` for direct local development or deployments where untrusted clients can set forwarded headers themselves.
 
 ## WebAuthn Alignment
 
