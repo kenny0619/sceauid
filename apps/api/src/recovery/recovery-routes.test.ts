@@ -29,6 +29,7 @@ const recoverySession: Session = {
 function createApp(
   options: {
     authenticatedSession?: Session | null;
+    rejectCancellation?: "expired" | "not_found" | "not_pending";
     recoverySession?: Session | null;
     rejectCompletion?: "expired" | "not_found" | "not_pending";
     rejectRegistrationStart?: "not_active" | "not_found";
@@ -123,6 +124,28 @@ function createApp(
             id: statusRecoveryRequestId,
             completedAt: new Date("2026-06-01T12:01:00.000Z"),
             status: "completed"
+          }
+        };
+      },
+      async cancelRecoveryRequest(statusRecoveryRequestId) {
+        if (options.rejectCancellation === "not_found") {
+          throw new Error("Recovery request was not found");
+        }
+
+        if (options.rejectCancellation === "expired") {
+          throw new Error("Recovery request is expired");
+        }
+
+        if (options.rejectCancellation === "not_pending") {
+          throw new Error("Recovery request is not pending");
+        }
+
+        return {
+          ok: true,
+          recoveryRequest: {
+            id: statusRecoveryRequestId,
+            cancelledAt: new Date("2026-06-01T12:02:00.000Z"),
+            status: "cancelled"
           }
         };
       },
@@ -227,6 +250,24 @@ describe("recovery routes", () => {
     });
   });
 
+  it("rejects recovery status requests with a recovery session", async () => {
+    const { app } = createApp({ authenticatedSession: recoverySession });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/recovery/status",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
+    });
+  });
+
   it("enrolls recovery codes for the authenticated user", async () => {
     const { app, enrollments } = createApp({ authenticatedSession: session });
 
@@ -250,6 +291,25 @@ describe("recovery routes", () => {
       recoveryCodesConfigured: true,
       unusedRecoveryCodeCount: 1
     });
+  });
+
+  it("rejects recovery code enrollment with a recovery session", async () => {
+    const { app, enrollments } = createApp({ authenticatedSession: recoverySession });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/codes",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "standard_session_required",
+      message: "Recovery sessions cannot access this endpoint"
+    });
+    expect(enrollments).toEqual([]);
   });
 
   it("redeems a recovery code without requiring a session", async () => {
@@ -441,6 +501,70 @@ describe("recovery routes", () => {
     });
   });
 
+  it("cancels recovery requests", async () => {
+    const { app } = createApp();
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/recovery/requests/${recoveryRequestId}`
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      recoveryRequest: {
+        id: recoveryRequestId,
+        cancelledAt: "2026-06-01T12:02:00.000Z",
+        status: "cancelled"
+      }
+    });
+  });
+
+  it("returns not found when cancelling unknown recovery requests", async () => {
+    const { app } = createApp({ rejectCancellation: "not_found" });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/recovery/requests/${recoveryRequestId}`
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({
+      error: "recovery_request_not_found",
+      message: "Recovery request was not found"
+    });
+  });
+
+  it("rejects expired recovery request cancellation", async () => {
+    const { app } = createApp({ rejectCancellation: "expired" });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/recovery/requests/${recoveryRequestId}`
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "recovery_request_expired",
+      message: "Recovery request is expired"
+    });
+  });
+
+  it("rejects non-pending recovery request cancellation", async () => {
+    const { app } = createApp({ rejectCancellation: "not_pending" });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/v1/recovery/requests/${recoveryRequestId}`
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: "recovery_request_not_pending",
+      message: "Recovery request is not pending"
+    });
+  });
+
   it("starts passkey registration with a recovery session", async () => {
     const { app, rateLimitChecks, recordedEvents, registrationStarts } = createApp();
 
@@ -527,6 +651,7 @@ describe("recovery routes", () => {
         metadata: {
           limit: 3,
           remaining: 0,
+          recoverySessionId: recoverySession.id,
           resetAt: "2026-06-01T12:15:00.000Z",
           scope: "recovery_passkey_registration_start",
           windowSeconds: 900
@@ -540,7 +665,7 @@ describe("recovery routes", () => {
   });
 
   it("rejects invalid recovery sessions for passkey registration", async () => {
-    const { app } = createApp({ recoverySession: null });
+    const { app, recordedEvents } = createApp({ recoverySession: null });
 
     const response = await app.inject({
       method: "POST",
@@ -556,10 +681,24 @@ describe("recovery routes", () => {
       error: "invalid_recovery_session",
       message: "Recovery session is invalid or expired"
     });
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: null,
+        eventType: "suspicious_activity_flagged",
+        metadata: {
+          reason: "invalid_or_expired_session",
+          scope: "recovery_passkey_registration_start"
+        },
+        outcome: "failure",
+        riskLevel: "medium",
+        sessionId: null,
+        userId: null
+      }
+    ]);
   });
 
   it("rejects non-recovery sessions for recovery passkey registration", async () => {
-    const { app } = createApp({ recoverySession: session });
+    const { app, recordedEvents } = createApp({ recoverySession: session });
 
     const response = await app.inject({
       method: "POST",
@@ -575,6 +714,21 @@ describe("recovery routes", () => {
       error: "invalid_recovery_session",
       message: "Recovery session is invalid or expired"
     });
+    expect(recordedEvents).toEqual([
+      {
+        actorUserId: userId,
+        eventType: "suspicious_activity_flagged",
+        metadata: {
+          reason: "non_recovery_session",
+          scope: "recovery_passkey_registration_start",
+          sessionKind: "standard"
+        },
+        outcome: "failure",
+        riskLevel: "medium",
+        sessionId: session.id,
+        userId
+      }
+    ]);
   });
 
   it("rejects recovery requests without a session cookie", async () => {
