@@ -267,6 +267,15 @@ export type CompleteRecoveryRequestResponse = {
   };
 };
 
+export type CancelRecoveryRequestResponse = {
+  ok: true;
+  recoveryRequest: {
+    id: string;
+    cancelledAt: string;
+    status: "cancelled";
+  };
+};
+
 export type StartRecoveryPasskeyRegistrationInput = {
   recoverySessionToken: string;
   userName: string;
@@ -426,6 +435,12 @@ export class SceauIDClient {
   ): Promise<CompleteRecoveryRequestResponse> {
     return this.request(`/v1/recovery/requests/${encodeURIComponent(recoveryRequestId)}/complete`, {
       method: "POST"
+    });
+  }
+
+  async cancelRecoveryRequest(recoveryRequestId: string): Promise<CancelRecoveryRequestResponse> {
+    return this.request(`/v1/recovery/requests/${encodeURIComponent(recoveryRequestId)}`, {
+      method: "DELETE"
     });
   }
 
