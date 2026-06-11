@@ -63,6 +63,13 @@ const revokedBackupPasskey: PasskeyCredential = {
   revokedAt: new Date("2026-06-01T12:45:00.000Z")
 };
 
+function expectAuditContext(): unknown {
+  return expect.objectContaining({
+    ipHash: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    traceId: expect.any(String)
+  });
+}
+
 function createApp(options: {
   authenticatedSession?: Session | null;
   passkeys?: PasskeyCredential[];
@@ -244,7 +251,8 @@ describe("passkey management routes", () => {
           deviceName: "MacBook Pro",
           passkeyId: "passkey-id",
           revokedAt: "2026-06-01T13:00:00.000Z"
-        }
+        },
+        context: expectAuditContext()
       }
     ]);
   });
