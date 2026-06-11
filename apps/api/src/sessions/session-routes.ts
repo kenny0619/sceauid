@@ -1,17 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import type { Session, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import { type SessionCookieOptions, clearSessionCookie } from "../http/session-cookie.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import { isFreshAuthentication, rejectFreshAuthRequired } from "./fresh-auth.js";
 import { isRecoverySession, sessionKind } from "./session-kind.js";
 import type { SessionService } from "./session-service.js";
-
-export type SessionCookieOptions = {
-  name: string;
-  path?: string;
-  sameSite?: "lax" | "none" | "strict";
-  secure?: boolean;
-};
 
 export type SessionRoutesDependencies = {
   securityEvents?: Pick<SecurityEventService, "record">;
@@ -25,26 +19,6 @@ export type SessionRoutesDependencies = {
 type SessionRouteParams = {
   sessionId: string;
 };
-
-function clearSessionCookie(
-  reply: {
-    clearCookie(
-      name: string,
-      options: {
-        path: string;
-        sameSite: "lax" | "none" | "strict";
-        secure: boolean;
-      }
-    ): unknown;
-  },
-  sessionCookie: SessionCookieOptions
-): void {
-  reply.clearCookie(sessionCookie.name, {
-    path: sessionCookie.path ?? "/",
-    sameSite: sessionCookie.sameSite ?? "lax",
-    secure: sessionCookie.secure ?? false
-  });
-}
 
 function serializeSession(session: Session, currentSessionId: string) {
   return {

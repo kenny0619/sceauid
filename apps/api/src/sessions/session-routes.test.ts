@@ -354,6 +354,7 @@ describe("session routes", () => {
     expect(revokedSessionIds).toEqual(["session-id"]);
     expect(response.headers["set-cookie"]).toContain("sceauid_session=;");
     expect(response.headers["set-cookie"]).toContain("Path=/");
+    expect(response.headers["set-cookie"]).toContain("HttpOnly");
     expect(response.headers["set-cookie"]).toContain("Secure");
     expect(response.headers["set-cookie"]).toContain("SameSite=Lax");
     expect(securityEvents).toEqual([

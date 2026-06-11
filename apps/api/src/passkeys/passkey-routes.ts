@@ -3,18 +3,11 @@ import { z } from "zod";
 import type { UserId } from "../domain/identity.js";
 import type { RiskStore } from "../domain/storage.js";
 import { type RateLimitPolicy, createRateLimitGuard } from "../http/rate-limit-guard.js";
+import { type SessionCookieOptions, setSessionCookie } from "../http/session-cookie.js";
 import type { PasskeyLoginFinishService } from "./passkey-login-finish-service.js";
 import type { PasskeyLoginStartService } from "./passkey-login-start-service.js";
 import type { PasskeyRegistrationFinishService } from "./passkey-registration-finish-service.js";
 import type { PasskeyRegistrationStartService } from "./passkey-registration-start-service.js";
-
-export type SessionCookieOptions = {
-  httpOnly?: boolean;
-  name: string;
-  path?: string;
-  sameSite?: "lax" | "none" | "strict";
-  secure?: boolean;
-};
 
 export type PasskeyRoutesDependencies = {
   loginFinishService: PasskeyLoginFinishService;
@@ -196,37 +189,6 @@ function resolveRegistrationFinishStatus(error: unknown): number {
   return 500;
 }
 
-function setSessionCookie(
-  reply: {
-    setCookie(
-      name: string,
-      value: string,
-      options: {
-        expires: Date;
-        httpOnly: boolean;
-        path: string;
-        sameSite: "lax" | "none" | "strict";
-        secure: boolean;
-      }
-    ): unknown;
-  },
-  sessionCookie: SessionCookieOptions | undefined,
-  token: string,
-  expiresAt: Date
-): void {
-  if (!sessionCookie) {
-    return;
-  }
-
-  reply.setCookie(sessionCookie.name, token, {
-    expires: expiresAt,
-    httpOnly: sessionCookie.httpOnly ?? true,
-    path: sessionCookie.path ?? "/",
-    sameSite: sessionCookie.sameSite ?? "lax",
-    secure: sessionCookie.secure ?? false
-  });
-}
-
 export async function registerPasskeyRoutes(
   app: FastifyInstance,
   dependencies: PasskeyRoutesDependencies
@@ -305,12 +267,14 @@ export async function registerPasskeyRoutes(
             : {})
         }
       });
-      setSessionCookie(
-        reply,
-        dependencies.sessionCookie,
-        result.session.token,
-        result.session.session.expiresAt
-      );
+      if (dependencies.sessionCookie) {
+        setSessionCookie(
+          reply,
+          dependencies.sessionCookie,
+          result.session.token,
+          result.session.session.expiresAt
+        );
+      }
 
       return reply.send({
         userId: result.userId,
