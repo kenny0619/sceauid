@@ -68,6 +68,7 @@ docs/
 - [Configuration](docs/operations/configuration.md)
 - [CSRF origin guard](docs/operations/csrf-origin-guard.md)
 - [Health and readiness](docs/operations/health.md)
+- [Rate limits](docs/operations/rate-limits.md)
 - [Request correlation](docs/operations/request-correlation.md)
 - [Security headers](docs/operations/security-headers.md)
 - [Architecture overview](docs/architecture/overview.md)
