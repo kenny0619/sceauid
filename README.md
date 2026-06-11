@@ -46,6 +46,7 @@ packages/
   express/   Express integration package
   fastify/   Fastify integration package
   nestjs/    NestJS integration package
+  nextjs/    Next.js integration package
 
 docs/
   api/
@@ -62,6 +63,7 @@ docs/
 - [Express integration](docs/sdk/express.md)
 - [Fastify integration](docs/sdk/fastify.md)
 - [NestJS integration](docs/sdk/nestjs.md)
+- [Next.js integration](docs/sdk/nextjs.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
 - [Decision records](docs/adr/)
