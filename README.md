@@ -65,6 +65,7 @@ docs/
 - [Fastify integration](docs/sdk/fastify.md)
 - [NestJS integration](docs/sdk/nestjs.md)
 - [Next.js integration](docs/sdk/nextjs.md)
+- [Configuration](docs/operations/configuration.md)
 - [Health and readiness](docs/operations/health.md)
 - [Request correlation](docs/operations/request-correlation.md)
 - [Architecture overview](docs/architecture/overview.md)
