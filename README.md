@@ -47,6 +47,7 @@ packages/
 
 docs/
   api/
+  sdk/
   architecture/
   security/
   adr/
@@ -55,6 +56,7 @@ docs/
 ## Documentation
 
 - [Passkey API](docs/api/passkeys.md)
+- [Browser SDK](docs/sdk/browser.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
 - [Decision records](docs/adr/)
