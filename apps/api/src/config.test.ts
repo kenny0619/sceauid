@@ -10,6 +10,7 @@ describe("loadConfig", () => {
       REDIS_URL: "redis://localhost:6379",
       SESSION_COOKIE_NAME: "sceauid_session",
       APP_ORIGIN: "http://localhost:3000",
+      TRUST_PROXY: false,
       WEBAUTHN_RP_NAME: "SceauID",
       WEBAUTHN_RP_ID: "localhost"
     });
@@ -24,6 +25,7 @@ describe("loadConfig", () => {
         REDIS_URL: "redis://redis.internal:6379",
         SESSION_COOKIE_NAME: "identity_session",
         APP_ORIGIN: "https://app.example.com",
+        TRUST_PROXY: "true",
         WEBAUTHN_RP_NAME: "Example App",
         WEBAUTHN_RP_ID: "app.example.com"
       })
@@ -34,9 +36,17 @@ describe("loadConfig", () => {
       REDIS_URL: "redis://redis.internal:6379",
       SESSION_COOKIE_NAME: "identity_session",
       APP_ORIGIN: "https://app.example.com",
+      TRUST_PROXY: true,
       WEBAUTHN_RP_NAME: "Example App",
       WEBAUTHN_RP_ID: "app.example.com"
     });
+  });
+
+  it("accepts explicit boolean-like trust proxy values", () => {
+    expect(loadConfig({ TRUST_PROXY: "1" }).TRUST_PROXY).toBe(true);
+    expect(loadConfig({ TRUST_PROXY: "true" }).TRUST_PROXY).toBe(true);
+    expect(loadConfig({ TRUST_PROXY: "0" }).TRUST_PROXY).toBe(false);
+    expect(loadConfig({ TRUST_PROXY: "false" }).TRUST_PROXY).toBe(false);
   });
 
   it("rejects missing production-critical config", () => {

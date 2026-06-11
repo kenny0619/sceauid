@@ -7,6 +7,11 @@ const productionRequiredKeys = [
   "WEBAUTHN_RP_ID"
 ] as const;
 
+const booleanEnvSchema = z
+  .enum(["0", "1", "false", "true"])
+  .default("false")
+  .transform((value) => value === "1" || value === "true");
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -14,6 +19,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
   SESSION_COOKIE_NAME: z.string().min(1).default("sceauid_session"),
   APP_ORIGIN: z.string().url().default("http://localhost:3000"),
+  TRUST_PROXY: booleanEnvSchema,
   WEBAUTHN_RP_NAME: z.string().min(1).default("SceauID"),
   WEBAUTHN_RP_ID: z.string().min(1).default("localhost")
 });
