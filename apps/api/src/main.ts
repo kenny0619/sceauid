@@ -6,6 +6,7 @@ import { loadConfig } from "./config.js";
 import { createDatabaseClient } from "./db/client.js";
 import { PostgresIdentityStore } from "./db/postgres-identity-store.js";
 import { registerHealthRoutes } from "./health/health-routes.js";
+import { registerRequestContext } from "./http/request-context.js";
 import { DefaultPasskeyLoginFinishService } from "./passkeys/passkey-login-finish-service.js";
 import { DefaultPasskeyLoginStartService } from "./passkeys/passkey-login-start-service.js";
 import { registerPasskeyManagementRoutes } from "./passkeys/passkey-management-routes.js";
@@ -82,7 +83,8 @@ const registrationFinishService = new DefaultPasskeyRegistrationFinishService(
 const app = Fastify({
   logger: {
     level: config.NODE_ENV === "development" ? "info" : "warn"
-  }
+  },
+  requestIdHeader: "x-request-id"
 });
 
 app.addHook("onClose", async () => {
@@ -97,6 +99,7 @@ await app.register(cors, {
 });
 
 await app.register(cookie);
+await registerRequestContext(app);
 await registerPasskeyRoutes(app, {
   loginFinishService,
   loginStartService,
