@@ -17,6 +17,7 @@ const session: Session = {
   ipHash: null,
   expiresAt: new Date("2026-07-01T12:00:00.000Z"),
   revokedAt: null,
+  authenticatedAt: new Date("2026-06-01T12:55:00.000Z"),
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
@@ -24,6 +25,12 @@ const recoverySession: Session = {
   ...session,
   id: "recovery-session-id" as SessionId,
   deviceLabel: "Recovery session"
+};
+
+const staleSession: Session = {
+  ...session,
+  id: "stale-session-id" as SessionId,
+  authenticatedAt: new Date("2026-06-01T12:49:59.000Z")
 };
 
 function createApp(
@@ -201,6 +208,7 @@ function createApp(
       }
     },
     sessionCookieName: "sceauid_session",
+    now: () => new Date("2026-06-01T13:00:00.000Z"),
     riskStore,
     securityEvents: {
       async record(input) {
@@ -291,6 +299,25 @@ describe("recovery routes", () => {
       recoveryCodesConfigured: true,
       unusedRecoveryCodeCount: 1
     });
+  });
+
+  it("requires fresh authentication before enrolling recovery codes", async () => {
+    const { app, enrollments } = createApp({ authenticatedSession: staleSession });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/recovery/codes",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "fresh_auth_required",
+      message: "Recent authentication is required for this action"
+    });
+    expect(enrollments).toEqual([]);
   });
 
   it("rejects recovery code enrollment with a recovery session", async () => {

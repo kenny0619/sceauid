@@ -22,6 +22,7 @@ const session: Session = {
   ipHash: null,
   expiresAt: new Date("2026-07-01T12:00:00.000Z"),
   revokedAt: null,
+  authenticatedAt: new Date("2026-06-01T12:55:00.000Z"),
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
@@ -31,6 +32,12 @@ const recoverySession: Session = {
   deviceLabel: "Recovery session",
   expiresAt: new Date("2026-06-01T12:16:00.000Z"),
   createdAt: new Date("2026-06-01T12:01:00.000Z")
+};
+
+const staleSession: Session = {
+  ...session,
+  id: "stale-session-id" as SessionId,
+  authenticatedAt: new Date("2026-06-01T12:49:59.000Z")
 };
 
 function createApp(options: {
@@ -71,7 +78,8 @@ function createApp(options: {
         expect(userId).toBe(user.id);
         return options.foundUser ?? null;
       }
-    }
+    },
+    now: () => new Date("2026-06-01T13:00:00.000Z")
   });
 
   return app;
@@ -117,6 +125,7 @@ describe("session routes", () => {
           userAgent: "test-agent",
           expiresAt: "2026-07-01T12:00:00.000Z",
           revokedAt: null,
+          authenticatedAt: "2026-06-01T12:55:00.000Z",
           createdAt: "2026-06-01T12:00:00.000Z"
         },
         {
@@ -127,6 +136,7 @@ describe("session routes", () => {
           userAgent: "other-agent",
           expiresAt: "2026-07-02T12:00:00.000Z",
           revokedAt: "2026-06-03T12:00:00.000Z",
+          authenticatedAt: "2026-06-01T12:55:00.000Z",
           createdAt: "2026-06-02T12:00:00.000Z"
         },
         {
@@ -137,6 +147,7 @@ describe("session routes", () => {
           userAgent: null,
           expiresAt: "2026-06-01T12:16:00.000Z",
           revokedAt: null,
+          authenticatedAt: "2026-06-01T12:55:00.000Z",
           createdAt: "2026-06-01T12:01:00.000Z"
         }
       ]
@@ -233,6 +244,7 @@ describe("session routes", () => {
         deviceLabel: "Safari on macOS",
         userAgent: "test-agent",
         expiresAt: "2026-07-01T12:00:00.000Z",
+        authenticatedAt: "2026-06-01T12:55:00.000Z",
         createdAt: "2026-06-01T12:00:00.000Z"
       }
     });
@@ -485,6 +497,36 @@ describe("session routes", () => {
         }
       }
     ]);
+  });
+
+  it("requires fresh authentication before revoking another session", async () => {
+    const revokedSessionIds: SessionId[] = [];
+    const otherSession: Session = {
+      ...session,
+      id: "other-session-id" as SessionId,
+      deviceLabel: "Chrome on Windows"
+    };
+    const app = createApp({
+      authenticatedSession: staleSession,
+      foundUser: user,
+      revokedSessionIds,
+      sessionsForUser: [staleSession, otherSession]
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/sessions/other-session-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "fresh_auth_required",
+      message: "Recent authentication is required for this action"
+    });
+    expect(revokedSessionIds).toEqual([]);
   });
 
   it("clears the session cookie when revoking the current session by id", async () => {

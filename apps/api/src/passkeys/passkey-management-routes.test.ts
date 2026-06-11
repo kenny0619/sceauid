@@ -22,6 +22,7 @@ const session: Session = {
   ipHash: null,
   expiresAt: new Date("2026-07-01T12:00:00.000Z"),
   revokedAt: null,
+  authenticatedAt: new Date("2026-06-01T12:55:00.000Z"),
   createdAt: new Date("2026-06-01T12:00:00.000Z")
 };
 
@@ -30,6 +31,12 @@ const recoverySession: Session = {
   id: "recovery-session-id" as SessionId,
   deviceLabel: "Recovery session",
   expiresAt: new Date("2026-06-01T12:16:00.000Z")
+};
+
+const staleSession: Session = {
+  ...session,
+  id: "stale-session-id" as SessionId,
+  authenticatedAt: new Date("2026-06-01T12:49:59.000Z")
 };
 
 const passkey: PasskeyCredential = {
@@ -267,6 +274,30 @@ describe("passkey management routes", () => {
         revokedAt: new Date("2026-06-01T13:00:00.000Z")
       }
     ]);
+  });
+
+  it("requires fresh authentication before revoking a passkey", async () => {
+    const revokedCredentials: Array<{ credentialId: string; revokedAt: Date }> = [];
+    const app = createApp({
+      authenticatedSession: staleSession,
+      passkeys: [passkey, backupPasskey],
+      revokedCredentials
+    });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/v1/passkeys/passkey-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({
+      error: "fresh_auth_required",
+      message: "Recent authentication is required for this action"
+    });
+    expect(revokedCredentials).toEqual([]);
   });
 
   it("rejects revoking the last active passkey", async () => {

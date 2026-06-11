@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { Session, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import { isFreshAuthentication, rejectFreshAuthRequired } from "./fresh-auth.js";
 import { isRecoverySession, sessionKind } from "./session-kind.js";
 import type { SessionService } from "./session-service.js";
 
@@ -17,6 +18,8 @@ export type SessionRoutesDependencies = {
   sessionCookie: SessionCookieOptions;
   sessionService: Pick<SessionService, "authenticate" | "listForUser" | "revoke">;
   store: Pick<IdentityStore, "findUserById">;
+  freshAuthWindowSeconds?: number;
+  now?: () => Date;
 };
 
 type SessionRouteParams = {
@@ -52,6 +55,7 @@ function serializeSession(session: Session, currentSessionId: string) {
     userAgent: session.userAgent,
     expiresAt: session.expiresAt.toISOString(),
     revokedAt: session.revokedAt?.toISOString() ?? null,
+    authenticatedAt: session.authenticatedAt.toISOString(),
     createdAt: session.createdAt.toISOString()
   };
 }
@@ -100,6 +104,8 @@ export async function registerSessionRoutes(
   app: FastifyInstance,
   dependencies: SessionRoutesDependencies
 ): Promise<void> {
+  const now = dependencies.now ?? (() => new Date());
+
   app.get("/v1/sessions", async (request, reply) => {
     const token = request.cookies[dependencies.sessionCookie.name];
 
@@ -174,6 +180,7 @@ export async function registerSessionRoutes(
         deviceLabel: session.deviceLabel,
         userAgent: session.userAgent,
         expiresAt: session.expiresAt.toISOString(),
+        authenticatedAt: session.authenticatedAt.toISOString(),
         createdAt: session.createdAt.toISOString()
       }
     });
@@ -234,6 +241,15 @@ export async function registerSessionRoutes(
         error: "session_not_found",
         message: "Session was not found"
       });
+    }
+
+    if (
+      targetSession.id !== currentSession.id &&
+      !isFreshAuthentication(currentSession, now(), {
+        windowSeconds: dependencies.freshAuthWindowSeconds
+      })
+    ) {
+      return rejectFreshAuthRequired(reply);
     }
 
     await dependencies.sessionService.revoke(targetSession.id);

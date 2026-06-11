@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { PasskeyCredential, SessionId, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
+import { isFreshAuthentication, rejectFreshAuthRequired } from "../sessions/fresh-auth.js";
 import { isRecoverySession } from "../sessions/session-kind.js";
 import type { SessionService } from "../sessions/session-service.js";
 
@@ -10,6 +11,7 @@ export type PasskeyManagementRoutesDependencies = {
   sessionCookieName: string;
   sessionService: Pick<SessionService, "authenticate">;
   store: Pick<IdentityStore, "listPasskeysForUser" | "revokePasskeyCredential">;
+  freshAuthWindowSeconds?: number;
   now?: () => Date;
 };
 
@@ -127,6 +129,14 @@ export async function registerPasskeyManagementRoutes(
 
     if (isRecoverySession(session)) {
       return rejectRecoverySession(reply);
+    }
+
+    if (
+      !isFreshAuthentication(session, now(), {
+        windowSeconds: dependencies.freshAuthWindowSeconds
+      })
+    ) {
+      return rejectFreshAuthRequired(reply);
     }
 
     const passkeys = await dependencies.store.listPasskeysForUser(session.userId);

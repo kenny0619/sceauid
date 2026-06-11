@@ -188,6 +188,7 @@ describe("passkey routes", () => {
                 ipHash: null,
                 expiresAt: new Date("2026-07-01T12:00:00.000Z"),
                 revokedAt: null,
+                authenticatedAt: new Date("2026-06-01T12:00:00.000Z"),
                 createdAt: new Date("2026-06-01T12:00:00.000Z")
               }
             }

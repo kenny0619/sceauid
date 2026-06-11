@@ -36,6 +36,7 @@ describe("database mappers", () => {
         ipHash: null,
         expiresAt,
         revokedAt: null,
+        authenticatedAt: now,
         createdAt: now
       })
     ).toMatchObject({

@@ -77,6 +77,7 @@ export type Session = {
   ipHash: string | null;
   expiresAt: Date;
   revokedAt: Date | null;
+  authenticatedAt: Date;
   createdAt: Date;
 };
 

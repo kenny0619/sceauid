@@ -16,6 +16,7 @@ describe("PostgresIdentityStore sessions", () => {
   it("creates and finds sessions by token hash", async () => {
     const user = await createTestUser(context);
     const expiresAt = new Date("2026-06-01T13:00:00.000Z");
+    const authenticatedAt = new Date("2026-06-01T12:05:00.000Z");
 
     const session = await context.store.createSession({
       userId: user.id,
@@ -23,7 +24,8 @@ describe("PostgresIdentityStore sessions", () => {
       deviceLabel: "Safari on macOS",
       userAgent: "test-agent",
       ipHash: "ip-hash",
-      expiresAt
+      expiresAt,
+      authenticatedAt
     });
 
     await expect(context.store.findSessionByTokenHash("token-hash-1")).resolves.toMatchObject({
@@ -31,6 +33,7 @@ describe("PostgresIdentityStore sessions", () => {
       userId: user.id,
       deviceLabel: "Safari on macOS",
       expiresAt,
+      authenticatedAt,
       revokedAt: null
     });
   });
