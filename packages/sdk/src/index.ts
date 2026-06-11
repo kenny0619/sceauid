@@ -1,3 +1,11 @@
+import {
+  startAuthentication as startWebAuthnAuthentication,
+  startRegistration as startWebAuthnRegistration
+} from "@simplewebauthn/browser";
+
+type BrowserStartRegistration = typeof startWebAuthnRegistration;
+type BrowserStartAuthentication = typeof startWebAuthnAuthentication;
+
 type SceauIDFetchResponse = {
   ok: boolean;
   status: number;
@@ -18,6 +26,21 @@ declare const fetch: SceauIDFetch;
 export type SceauIDClientOptions = {
   baseUrl: string;
   fetch?: SceauIDFetch;
+};
+
+export type WebAuthnRegistrationOptions = Parameters<BrowserStartRegistration>[0]["optionsJSON"];
+export type WebAuthnAuthenticationOptions =
+  Parameters<BrowserStartAuthentication>[0]["optionsJSON"];
+export type WebAuthnRegistrationCredential = Awaited<ReturnType<BrowserStartRegistration>>;
+export type WebAuthnAuthenticationCredential = Awaited<ReturnType<BrowserStartAuthentication>>;
+
+export type SceauIDBrowserCeremonies = {
+  startAuthentication?: BrowserStartAuthentication;
+  startRegistration?: BrowserStartRegistration;
+};
+
+export type SceauIDBrowserClientOptions = SceauIDClientOptions & {
+  ceremonies?: SceauIDBrowserCeremonies;
 };
 
 export type SceauIDErrorBody = {
@@ -59,7 +82,7 @@ export type PasskeyRegistrationStartInput = {
 export type PasskeyRegistrationStartResponse = {
   registrationId: string;
   expiresAt: string;
-  options: unknown;
+  options: WebAuthnRegistrationOptions;
 };
 
 export type PasskeyRegistrationCredential = {
@@ -101,7 +124,7 @@ export type PasskeyLoginStartInput = {
 export type PasskeyLoginStartResponse = {
   loginId: string;
   expiresAt: string;
-  options: unknown;
+  options: WebAuthnAuthenticationOptions;
 };
 
 export type PasskeyLoginCredential = {
@@ -280,6 +303,22 @@ export type StartRecoveryPasskeyRegistrationInput = {
   recoverySessionToken: string;
   userName: string;
   userDisplayName?: string | null;
+};
+
+export type BrowserPasskeyRegistrationInput = PasskeyRegistrationStartInput & {
+  deviceName?: string | null;
+  useAutoRegister?: boolean;
+};
+
+export type BrowserPasskeyLoginInput = PasskeyLoginStartInput & {
+  deviceLabel?: string | null;
+  useBrowserAutofill?: boolean;
+  verifyBrowserAutofillInput?: boolean;
+};
+
+export type BrowserRecoveryPasskeyRegistrationInput = StartRecoveryPasskeyRegistrationInput & {
+  deviceName?: string | null;
+  useAutoRegister?: boolean;
 };
 
 export class SceauIDClient {
@@ -480,6 +519,116 @@ export class SceauIDClient {
 
     return response.json() as Promise<TResponse>;
   }
+}
+
+export class SceauIDBrowserClient extends SceauIDClient {
+  private readonly startAuthenticationCeremony: BrowserStartAuthentication;
+  private readonly startRegistrationCeremony: BrowserStartRegistration;
+
+  constructor(options: SceauIDBrowserClientOptions) {
+    super(options);
+    this.startAuthenticationCeremony =
+      options.ceremonies?.startAuthentication ?? startWebAuthnAuthentication;
+    this.startRegistrationCeremony =
+      options.ceremonies?.startRegistration ?? startWebAuthnRegistration;
+  }
+
+  async registerPasskey(
+    input: BrowserPasskeyRegistrationInput
+  ): Promise<PasskeyRegistrationFinishResponse> {
+    const registration = await this.startPasskeyRegistration({
+      userId: input.userId,
+      userName: input.userName,
+      userDisplayName: input.userDisplayName
+    });
+    const credential = await this.startRegistrationCeremony({
+      optionsJSON: registration.options,
+      useAutoRegister: input.useAutoRegister
+    });
+
+    return this.finishPasskeyRegistration({
+      registrationId: registration.registrationId,
+      credential: toPasskeyRegistrationCredential(credential),
+      deviceName: input.deviceName
+    });
+  }
+
+  async loginWithPasskey(
+    input: BrowserPasskeyLoginInput = {}
+  ): Promise<PasskeyLoginFinishResponse> {
+    const login = await this.startPasskeyLogin({
+      userId: input.userId
+    });
+    const credential = await this.startAuthenticationCeremony({
+      optionsJSON: login.options,
+      useBrowserAutofill: input.useBrowserAutofill,
+      verifyBrowserAutofillInput: input.verifyBrowserAutofillInput
+    });
+
+    return this.finishPasskeyLogin({
+      loginId: login.loginId,
+      credential: toPasskeyLoginCredential(credential),
+      deviceLabel: input.deviceLabel
+    });
+  }
+
+  async registerRecoveryPasskey(
+    input: BrowserRecoveryPasskeyRegistrationInput
+  ): Promise<PasskeyRegistrationFinishResponse> {
+    const registration = await this.startRecoveryPasskeyRegistration({
+      recoverySessionToken: input.recoverySessionToken,
+      userName: input.userName,
+      userDisplayName: input.userDisplayName
+    });
+    const credential = await this.startRegistrationCeremony({
+      optionsJSON: registration.options,
+      useAutoRegister: input.useAutoRegister
+    });
+
+    return this.finishPasskeyRegistration({
+      registrationId: registration.registrationId,
+      credential: toPasskeyRegistrationCredential(credential),
+      deviceName: input.deviceName
+    });
+  }
+}
+
+function toPasskeyRegistrationCredential(
+  credential: WebAuthnRegistrationCredential
+): PasskeyRegistrationCredential {
+  return {
+    id: credential.id,
+    rawId: credential.rawId,
+    response: {
+      attestationObject: credential.response.attestationObject,
+      authenticatorData: credential.response.authenticatorData,
+      clientDataJSON: credential.response.clientDataJSON,
+      publicKey: credential.response.publicKey,
+      publicKeyAlgorithm: credential.response.publicKeyAlgorithm,
+      transports: credential.response.transports as PasskeyAuthenticatorTransport[] | undefined
+    },
+    authenticatorAttachment: credential.authenticatorAttachment,
+    clientExtensionResults: { ...credential.clientExtensionResults },
+    type: "public-key"
+  };
+}
+
+function toPasskeyLoginCredential(
+  credential: WebAuthnAuthenticationCredential
+): PasskeyLoginCredential {
+  return {
+    id: credential.id,
+    rawId: credential.rawId,
+    response: {
+      authenticatorData: credential.response.authenticatorData,
+      clientDataJSON: credential.response.clientDataJSON,
+      signature: credential.response.signature,
+      userHandle: credential.response.userHandle
+    },
+    authenticatorAttachment: credential.authenticatorAttachment,
+    clientExtensionResults: { ...credential.clientExtensionResults },
+    type: "public-key"
+  };
 }
 
 async function parseErrorBody(response: SceauIDFetchResponse): Promise<SceauIDErrorBody> {
