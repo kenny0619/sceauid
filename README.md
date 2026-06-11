@@ -66,6 +66,7 @@ docs/
 - [NestJS integration](docs/sdk/nestjs.md)
 - [Next.js integration](docs/sdk/nextjs.md)
 - [Configuration](docs/operations/configuration.md)
+- [CSRF origin guard](docs/operations/csrf-origin-guard.md)
 - [Health and readiness](docs/operations/health.md)
 - [Request correlation](docs/operations/request-correlation.md)
 - [Architecture overview](docs/architecture/overview.md)
