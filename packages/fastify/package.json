@@ -1,0 +1,26 @@
+{
+  "name": "@sceauid/fastify",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "dependencies": {
+    "@sceauid/sdk": "workspace:*",
+    "fastify-plugin": "^6.0.0"
+  },
+  "peerDependencies": {
+    "fastify": ">=5 <6"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "fastify": "^5.3.3",
+    "vitest": "^3.1.4"
+  }
+}

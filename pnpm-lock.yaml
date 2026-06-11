@@ -92,6 +92,22 @@ importers:
         specifier: ^3.1.4
         version: 3.2.4(@types/node@22.19.19)(tsx@4.22.3)
 
+  packages/fastify:
+    dependencies:
+      '@sceauid/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+      fastify-plugin:
+        specifier: ^6.0.0
+        version: 6.0.0
+    devDependencies:
+      fastify:
+        specifier: ^5.3.3
+        version: 5.8.5
+      vitest:
+        specifier: ^3.1.4
+        version: 3.2.4(@types/node@22.19.19)(tsx@4.22.3)
+
   packages/nestjs:
     dependencies:
       '@sceauid/sdk':
@@ -1449,6 +1465,9 @@ packages:
 
   fastify-plugin@5.1.0:
     resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
+
+  fastify-plugin@6.0.0:
+    resolution: {integrity: sha512-fZOty7z3O7vOliF6d8bHE3wiEh1KcNnKEQensSgTk9C1DvN6nRLS++XVd86v33Hw/8u9Un8A1zDrQ8ujcQDHEg==}
 
   fastify@5.8.5:
     resolution: {integrity: sha512-Yqptv59pQzPgQUSIm87hMqHJmdkb1+GPxdE6vW6FRyVE9G86mt7rOghitiU4JHRaTyDUk9pfeKmDeu70lAwM4Q==}
@@ -3023,6 +3042,8 @@ snapshots:
   fast-uri@3.1.2: {}
 
   fastify-plugin@5.1.0: {}
+
+  fastify-plugin@6.0.0: {}
 
   fastify@5.8.5:
     dependencies:
