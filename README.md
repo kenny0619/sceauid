@@ -43,6 +43,7 @@ apps/
 packages/
   sdk/       TypeScript integration client
   cli/       Operational CLI
+  express/   Express integration package
   nestjs/    NestJS integration package
 
 docs/
@@ -57,6 +58,7 @@ docs/
 
 - [Passkey API](docs/api/passkeys.md)
 - [Browser SDK](docs/sdk/browser.md)
+- [Express integration](docs/sdk/express.md)
 - [NestJS integration](docs/sdk/nestjs.md)
 - [Architecture overview](docs/architecture/overview.md)
 - [Threat model draft](docs/security/threat-model.md)
