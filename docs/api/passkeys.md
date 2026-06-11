@@ -555,6 +555,8 @@ Session creation events include metadata for `loginId`, `credentialId`, `passkey
 
 Session revocation events include metadata for `reason`, `actorSessionId`, whether the revoked session was the actor's own session, and target session device/timing fields.
 
+Passkey ceremony events include request context when available: `traceId`, `userAgent`, and hashed `ipHash`. Raw client IP addresses are not stored in the security-event context.
+
 Recovery code enrollment events include metadata for `codeCount` and `enrolledAt`. Recovery code redemption events include metadata for `redeemedAt` and use medium risk.
 
 Recovery redemption rate-limit events use `rate_limit_triggered` with metadata for `scope`, `limit`, `remaining`, `windowSeconds`, and `resetAt`.
