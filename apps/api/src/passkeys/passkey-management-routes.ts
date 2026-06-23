@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import type { PasskeyCredential, SessionId, UserId } from "../domain/identity.js";
+import type { PasskeyCredential, RequestContext, SessionId, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import { resolveRequestAuditContext } from "../http/request-audit-context.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import { isFreshAuthentication, rejectFreshAuthRequired } from "../sessions/fresh-auth.js";
 import { isRecoverySession } from "../sessions/session-kind.js";
@@ -28,6 +29,7 @@ async function recordPasskeyRemoved(
   input: {
     actorSessionId: SessionId;
     actorUserId: UserId;
+    context?: RequestContext;
     passkey: PasskeyCredential;
     revokedAt: Date;
   }
@@ -44,7 +46,8 @@ async function recordPasskeyRemoved(
         deviceName: input.passkey.deviceName,
         passkeyId: input.passkey.id,
         revokedAt: input.revokedAt.toISOString()
-      }
+      },
+      ...(input.context ? { context: input.context } : {})
     })
     .catch(() => undefined);
 }
@@ -162,6 +165,7 @@ export async function registerPasskeyManagementRoutes(
     await recordPasskeyRemoved(dependencies.securityEvents, {
       actorSessionId: session.id,
       actorUserId: session.userId,
+      context: resolveRequestAuditContext(request),
       passkey,
       revokedAt
     });
