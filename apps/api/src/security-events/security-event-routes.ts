@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type {
+  RequestContext,
   RiskLevel,
   SecurityEvent,
   SecurityEventId,
@@ -100,6 +101,14 @@ const recoveryEventTypes = [
   "recovery_delayed"
 ] as const satisfies readonly SecurityEventType[];
 
+function serializeRequestContext(context: RequestContext): RequestContext {
+  return {
+    ...(typeof context.ipHash === "string" ? { ipHash: context.ipHash } : {}),
+    ...(typeof context.userAgent === "string" ? { userAgent: context.userAgent } : {}),
+    ...(typeof context.traceId === "string" ? { traceId: context.traceId } : {})
+  };
+}
+
 function serializeSecurityEvent(event: SecurityEvent) {
   return {
     id: event.id,
@@ -110,7 +119,7 @@ function serializeSecurityEvent(event: SecurityEvent) {
     outcome: event.outcome,
     riskLevel: event.riskLevel,
     metadata: event.metadata,
-    context: event.context,
+    context: serializeRequestContext(event.context),
     createdAt: event.createdAt.toISOString()
   };
 }

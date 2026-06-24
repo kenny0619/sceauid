@@ -176,6 +176,42 @@ describe("security event routes", () => {
     });
   });
 
+  it("redacts unsupported context fields from listed security events", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      events: [
+        {
+          ...event,
+          context: {
+            ipHash: "ip-hash",
+            userAgent: "test-agent",
+            traceId: "trace-id",
+            rawIp: "203.0.113.10",
+            forwardedFor: "203.0.113.10",
+            nested: {
+              rawIp: "203.0.113.10"
+            }
+          } as never
+        }
+      ]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().events[0].context).toEqual({
+      ipHash: "ip-hash",
+      userAgent: "test-agent",
+      traceId: "trace-id"
+    });
+  });
+
   it("returns a security event detail for the authenticated user", async () => {
     const findCalls: Array<{ userId: UserId; eventId: SecurityEventId }> = [];
     const app = createApp({
@@ -211,6 +247,36 @@ describe("security event routes", () => {
         },
         createdAt: "2026-06-01T12:01:00.000Z"
       }
+    });
+  });
+
+  it("redacts unsupported context fields from security event details", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      event: {
+        ...event,
+        context: {
+          ipHash: "ip-hash",
+          userAgent: "test-agent",
+          traceId: "trace-id",
+          rawIp: "203.0.113.10"
+        } as never
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events/event-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().event.context).toEqual({
+      ipHash: "ip-hash",
+      userAgent: "test-agent",
+      traceId: "trace-id"
     });
   });
 
