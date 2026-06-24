@@ -20,6 +20,7 @@ const envSchema = z.object({
   SESSION_COOKIE_NAME: z.string().min(1).default("sceauid_session"),
   APP_ORIGIN: z.string().url().default("http://localhost:3000"),
   TRUST_PROXY: booleanEnvSchema,
+  SECURITY_EVENT_RETENTION_DAYS: z.coerce.number().int().positive().max(3650).default(365),
   WEBAUTHN_RP_NAME: z.string().min(1).default("SceauID"),
   WEBAUTHN_RP_ID: z.string().min(1).default("localhost")
 });
