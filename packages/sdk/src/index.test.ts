@@ -312,9 +312,12 @@ describe("SceauIDClient", () => {
 
     const result = await client.securityEvents({
       cursor: "current-page-token",
+      actorUserId: "actor-user-id",
+      sessionId: "session-id",
       eventTypes: ["login_failed", "session_revoked"],
       outcomes: ["failure"],
       riskLevels: ["medium", "high"],
+      traceId: "trace-id",
       createdAfter: new Date("2026-06-01T00:00:00.000Z"),
       createdBefore: "2026-06-02T00:00:00.000Z",
       limit: 10
@@ -332,7 +335,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/security-events?limit=10&cursor=current-page-token&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high&createdAfter=2026-06-01T00%3A00%3A00.000Z&createdBefore=2026-06-02T00%3A00%3A00.000Z"
+        url: "https://identity.example.com/v1/security-events?limit=10&cursor=current-page-token&actorUserId=actor-user-id&sessionId=session-id&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high&traceId=trace-id&createdAfter=2026-06-01T00%3A00%3A00.000Z&createdBefore=2026-06-02T00%3A00%3A00.000Z"
       }
     ]);
   });
@@ -404,8 +407,11 @@ describe("SceauIDClient", () => {
 
     const result = await client.recoveryEvents({
       cursor: "current-page-token",
+      actorUserId: "actor-user-id",
+      sessionId: "recovery-session-id",
       outcomes: ["success"],
       riskLevels: ["medium"],
+      traceId: "trace-id",
       createdAfter: "2026-06-01T00:00:00.000Z",
       createdBefore: new Date("2026-06-02T00:00:00.000Z"),
       limit: 10
@@ -422,7 +428,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/recovery/events?limit=10&cursor=current-page-token&outcome=success&riskLevel=medium&createdAfter=2026-06-01T00%3A00%3A00.000Z&createdBefore=2026-06-02T00%3A00%3A00.000Z"
+        url: "https://identity.example.com/v1/recovery/events?limit=10&cursor=current-page-token&actorUserId=actor-user-id&sessionId=recovery-session-id&outcome=success&riskLevel=medium&traceId=trace-id&createdAfter=2026-06-01T00%3A00%3A00.000Z&createdBefore=2026-06-02T00%3A00%3A00.000Z"
       }
     ]);
   });
