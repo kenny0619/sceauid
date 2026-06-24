@@ -29,9 +29,12 @@ export type SecurityEventService = {
 
 export type ListSecurityEventsInput = {
   cursor?: string;
+  actorUserId?: UserId;
+  sessionId?: SessionId;
   eventTypes?: SecurityEventType[];
   outcomes?: SecurityEventOutcome[];
   riskLevels?: RiskLevel[];
+  traceId?: string;
   createdAfter?: Date;
   createdBefore?: Date;
   limit?: number;
@@ -159,9 +162,12 @@ export class DefaultSecurityEventService implements SecurityEventService {
     const page = await this.store.listSecurityEventsForUser({
       userId,
       cursor: decodeCursor(input.cursor),
+      actorUserId: input.actorUserId,
+      sessionId: input.sessionId,
       eventTypes: input.eventTypes?.length ? input.eventTypes : undefined,
       outcomes: input.outcomes?.length ? input.outcomes : undefined,
       riskLevels: input.riskLevels?.length ? input.riskLevels : undefined,
+      traceId: input.traceId,
       createdAfter: input.createdAfter,
       createdBefore: input.createdBefore,
       limit: normalizeLimit(input.limit)
