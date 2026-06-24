@@ -45,6 +45,18 @@ export type ListSecurityEventsPage = {
   nextCursor?: string;
 };
 
+export type PruneSecurityEventsInput = {
+  batchSize?: number;
+  maxBatches?: number;
+};
+
+export type PruneSecurityEventsResult = {
+  cutoff: Date;
+  deletedCount: number;
+  batches: number;
+  complete: boolean;
+};
+
 export class InvalidSecurityEventCursorError extends Error {
   constructor() {
     super("Security event cursor is invalid");
@@ -54,6 +66,10 @@ export class InvalidSecurityEventCursorError extends Error {
 
 const defaultListLimit = 50;
 const maxListLimit = 100;
+const defaultPruneBatchSize = 1000;
+const maxPruneBatchSize = 10_000;
+const defaultPruneMaxBatches = 1000;
+const maxPruneMaxBatches = 10_000;
 
 function sanitizeRecord(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -85,6 +101,28 @@ function normalizeLimit(limit: number | undefined): number {
   }
 
   return Math.min(Math.floor(limit), maxListLimit);
+}
+
+function normalizePositiveInteger(
+  value: number | undefined,
+  fallback: number,
+  max: number
+): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (!Number.isFinite(value) || value < 1) {
+    return fallback;
+  }
+
+  return Math.min(Math.floor(value), max);
+}
+
+function assertValidDate(value: Date, message: string): void {
+  if (Number.isNaN(value.getTime())) {
+    throw new Error(message);
+  }
 }
 
 function encodeCursor(cursor: SecurityEventCursor): string {
@@ -134,7 +172,10 @@ export class DefaultSecurityEventService implements SecurityEventService {
   constructor(
     private readonly store: Pick<
       IdentityStore,
-      "createSecurityEvent" | "findSecurityEventForUser" | "listSecurityEventsForUser"
+      | "createSecurityEvent"
+      | "findSecurityEventForUser"
+      | "listSecurityEventsForUser"
+      | "deleteSecurityEventsBefore"
     >
   ) {}
 
@@ -176,6 +217,49 @@ export class DefaultSecurityEventService implements SecurityEventService {
     return {
       events: page.events,
       ...(page.nextCursor ? { nextCursor: encodeCursor(page.nextCursor) } : {})
+    };
+  }
+
+  async pruneBefore(
+    cutoff: Date,
+    input: PruneSecurityEventsInput = {}
+  ): Promise<PruneSecurityEventsResult> {
+    assertValidDate(cutoff, "Security event retention cutoff is invalid");
+
+    const batchSize = normalizePositiveInteger(
+      input.batchSize,
+      defaultPruneBatchSize,
+      maxPruneBatchSize
+    );
+    const maxBatches = normalizePositiveInteger(
+      input.maxBatches,
+      defaultPruneMaxBatches,
+      maxPruneMaxBatches
+    );
+    let deletedCount = 0;
+    let batches = 0;
+
+    while (batches < maxBatches) {
+      const deleted = await this.store.deleteSecurityEventsBefore(cutoff, batchSize);
+      deletedCount += deleted;
+
+      if (deleted === 0 || deleted < batchSize) {
+        return {
+          cutoff,
+          deletedCount,
+          batches: deleted > 0 ? batches + 1 : batches,
+          complete: true
+        };
+      }
+
+      batches += 1;
+    }
+
+    return {
+      cutoff,
+      deletedCount,
+      batches,
+      complete: false
     };
   }
 }

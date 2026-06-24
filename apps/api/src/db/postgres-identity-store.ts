@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   type RecoveryRequestId,
   type SecurityEventId,
@@ -416,5 +416,21 @@ export class PostgresIdentityStore implements IdentityStore {
         ? { nextCursor: { createdAt: lastEvent.createdAt, id: lastEvent.id } }
         : {})
     };
+  }
+
+  async deleteSecurityEventsBefore(cutoff: Date, limit: number) {
+    const eventsToDelete = this.db
+      .select({ id: securityEvents.id })
+      .from(securityEvents)
+      .where(lt(securityEvents.createdAt, cutoff))
+      .orderBy(asc(securityEvents.createdAt), asc(securityEvents.id))
+      .limit(limit);
+
+    const deleted = await this.db
+      .delete(securityEvents)
+      .where(inArray(securityEvents.id, eventsToDelete))
+      .returning({ id: securityEvents.id });
+
+    return deleted.length;
   }
 }
