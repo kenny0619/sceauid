@@ -214,9 +214,12 @@ export type ListedSecurityEvent = {
 
 export type ListSecurityEventsInput = {
   cursor?: string;
+  actorUserId?: string;
+  sessionId?: string;
   eventTypes?: string[];
   outcomes?: Array<"failure" | "pending" | "success">;
   riskLevels?: Array<"high" | "low" | "medium">;
+  traceId?: string;
   createdAfter?: Date | string;
   createdBefore?: Date | string;
   limit?: number;
@@ -409,6 +412,14 @@ export class SceauIDClient {
       searchParams.set("cursor", input.cursor);
     }
 
+    if (input.actorUserId !== undefined) {
+      searchParams.set("actorUserId", input.actorUserId);
+    }
+
+    if (input.sessionId !== undefined) {
+      searchParams.set("sessionId", input.sessionId);
+    }
+
     for (const eventType of input.eventTypes ?? []) {
       searchParams.append("eventType", eventType);
     }
@@ -419,6 +430,10 @@ export class SceauIDClient {
 
     for (const riskLevel of input.riskLevels ?? []) {
       searchParams.append("riskLevel", riskLevel);
+    }
+
+    if (input.traceId !== undefined) {
+      searchParams.set("traceId", input.traceId);
     }
 
     appendDateQueryParam(searchParams, "createdAfter", input.createdAfter);
@@ -444,12 +459,24 @@ export class SceauIDClient {
       searchParams.set("cursor", input.cursor);
     }
 
+    if (input.actorUserId !== undefined) {
+      searchParams.set("actorUserId", input.actorUserId);
+    }
+
+    if (input.sessionId !== undefined) {
+      searchParams.set("sessionId", input.sessionId);
+    }
+
     for (const outcome of input.outcomes ?? []) {
       searchParams.append("outcome", outcome);
     }
 
     for (const riskLevel of input.riskLevels ?? []) {
       searchParams.append("riskLevel", riskLevel);
+    }
+
+    if (input.traceId !== undefined) {
+      searchParams.set("traceId", input.traceId);
     }
 
     appendDateQueryParam(searchParams, "createdAfter", input.createdAfter);

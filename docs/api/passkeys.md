@@ -565,15 +565,15 @@ Failed recovery code redemption attempts record `recovery_code_redeemed` with `o
 
 ### List Recovery Events
 
-`GET /v1/recovery/events?limit=50&outcome=success&riskLevel=medium&createdAfter=2026-06-01T00:00:00.000Z&createdBefore=2026-06-02T00:00:00.000Z&cursor=next_page_token`
+`GET /v1/recovery/events?limit=50&outcome=success&riskLevel=medium&actorUserId=user_123&sessionId=session_123&traceId=req_abc123&createdAfter=2026-06-01T00:00:00.000Z&createdBefore=2026-06-02T00:00:00.000Z&cursor=next_page_token`
 
 Authenticated clients can fetch the current user's recovery-focused security timeline without manually selecting recovery event types.
 
-The response shape matches `GET /v1/security-events`. `limit`, `cursor`, `outcome`, `riskLevel`, `createdAfter`, and `createdBefore` use the same rules as the general security event list.
+The response shape matches `GET /v1/security-events`. `limit`, `cursor`, `actorUserId`, `sessionId`, `traceId`, `outcome`, `riskLevel`, `createdAfter`, and `createdBefore` use the same rules as the general security event list.
 
 ### List Security Events
 
-`GET /v1/security-events?limit=50&eventType=login_failed&outcome=failure&riskLevel=medium&createdAfter=2026-06-01T00:00:00.000Z&createdBefore=2026-06-02T00:00:00.000Z&cursor=next_page_token`
+`GET /v1/security-events?limit=50&eventType=login_failed&outcome=failure&riskLevel=medium&actorUserId=user_123&sessionId=session_123&traceId=req_abc123&createdAfter=2026-06-01T00:00:00.000Z&createdBefore=2026-06-02T00:00:00.000Z&cursor=next_page_token`
 
 Authenticated clients can fetch the current user's security timeline.
 
@@ -608,6 +608,8 @@ Response:
 `eventType` is optional and can be provided more than once or as a comma-separated list.
 
 `outcome` and `riskLevel` are optional filters and follow the same repeated or comma-separated format.
+
+`actorUserId`, `sessionId`, and `traceId` are optional exact-match filters. Use them to review activity performed by a specific actor, tied to a specific session, or correlated with a request ID.
 
 `createdAfter` and `createdBefore` are optional inclusive ISO timestamp filters. Use them to fetch an investigation window without scanning the full security timeline.
 

@@ -433,6 +433,30 @@ describe("security event routes", () => {
     ]);
   });
 
+  it("filters security events by actor, session, and trace id", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?actorUserId=actor-user-id&sessionId=session-id&traceId=trace-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls[0]?.input).toMatchObject({
+      actorUserId: "actor-user-id" as UserId,
+      sessionId: "session-id" as SessionId,
+      traceId: "trace-id"
+    });
+  });
+
   it("lists recovery events with the recovery event type preset", async () => {
     const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
     const app = createApp({
@@ -515,6 +539,30 @@ describe("security event routes", () => {
     expect(listCalls[0]?.input).toMatchObject({
       createdAfter: new Date("2026-06-01T00:00:00.000Z"),
       createdBefore: new Date("2026-06-02T00:00:00.000Z")
+    });
+  });
+
+  it("filters recovery events by actor, session, and trace id", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/recovery/events?actorUserId=actor-user-id&sessionId=session-id&traceId=trace-id",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls[0]?.input).toMatchObject({
+      actorUserId: "actor-user-id" as UserId,
+      sessionId: "session-id" as SessionId,
+      traceId: "trace-id"
     });
   });
 

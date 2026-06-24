@@ -136,9 +136,12 @@ export type RiskStore = {
 
 export type SecurityEventFilter = {
   userId?: UserId;
+  actorUserId?: UserId;
+  sessionId?: SessionId;
   eventTypes?: SecurityEventType[];
   outcomes?: SecurityEventOutcome[];
   riskLevels?: RiskLevel[];
+  traceId?: string;
   createdAfter?: Date;
   createdBefore?: Date;
   cursor?: SecurityEventCursor;

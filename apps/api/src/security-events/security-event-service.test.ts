@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SecurityEvent, SecurityEventId, UserId } from "../domain/identity.js";
+import type { SecurityEvent, SecurityEventId, SessionId, UserId } from "../domain/identity.js";
 import type {
   CreateSecurityEventInput,
   IdentityStore,
@@ -129,9 +129,43 @@ describe("DefaultSecurityEventService", () => {
     expect(listCalls).toEqual([
       {
         userId,
+        actorUserId: undefined,
+        sessionId: undefined,
         eventTypes: ["login_failed", "session_revoked"],
         outcomes: ["failure"],
         riskLevels: ["medium", "high"],
+        traceId: undefined,
+        cursor: undefined,
+        limit: 25
+      }
+    ]);
+  });
+
+  it("passes investigation filters to storage", async () => {
+    const { store, listCalls } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+    const userId = "user-id" as UserId;
+    const actorUserId = "actor-user-id" as UserId;
+    const sessionId = "session-id" as SessionId;
+
+    await service.listForUser(userId, {
+      actorUserId,
+      sessionId,
+      traceId: "trace-id",
+      limit: 25
+    });
+
+    expect(listCalls).toEqual([
+      {
+        userId,
+        actorUserId,
+        sessionId,
+        eventTypes: undefined,
+        outcomes: undefined,
+        riskLevels: undefined,
+        traceId: "trace-id",
+        createdAfter: undefined,
+        createdBefore: undefined,
         cursor: undefined,
         limit: 25
       }
@@ -154,9 +188,12 @@ describe("DefaultSecurityEventService", () => {
     expect(listCalls).toEqual([
       {
         userId,
+        actorUserId: undefined,
+        sessionId: undefined,
         eventTypes: undefined,
         outcomes: undefined,
         riskLevels: undefined,
+        traceId: undefined,
         createdAfter,
         createdBefore,
         cursor: undefined,

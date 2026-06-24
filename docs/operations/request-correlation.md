@@ -10,7 +10,7 @@ If a client sends `x-request-id`, SceauID reuses it. Otherwise, Fastify generate
 
 Authentication and recovery security events also include the request ID as `context.traceId` when request context is available. SceauID records `context.userAgent` and a hashed `context.ipHash` so operators can investigate auth activity without storing raw client IP addresses in the security-event timeline.
 
-Security-event list endpoints accept `createdAfter` and `createdBefore` ISO timestamp filters. Use them with `context.traceId` when reviewing a specific incident window.
+Security-event list endpoints accept `traceId`, `sessionId`, `actorUserId`, `createdAfter`, and `createdBefore` filters. Use them together when reviewing a specific request, session, actor, or incident window.
 
 ## Error Responses
 
