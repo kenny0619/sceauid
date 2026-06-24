@@ -386,4 +386,53 @@ describe("PostgresIdentityStore security events", () => {
 
     expect(page.events.map((event) => event.metadata)).toEqual([{ match: true }]);
   });
+
+  it("deletes old security events in bounded batches", async () => {
+    const user = await createTestUser(context);
+
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_failed",
+      outcome: "failure",
+      riskLevel: "medium",
+      metadata: { retained: false, batch: 1 },
+      context: {}
+    });
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "session_revoked",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: { retained: false, batch: 2 },
+      context: {}
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const cutoff = new Date();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_succeeded",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: { retained: true },
+      context: {}
+    });
+
+    await expect(context.store.deleteSecurityEventsBefore(cutoff, 1)).resolves.toBe(1);
+    await expect(context.store.deleteSecurityEventsBefore(cutoff, 1)).resolves.toBe(1);
+    await expect(context.store.deleteSecurityEventsBefore(cutoff, 1)).resolves.toBe(0);
+
+    const page = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      limit: 10
+    });
+
+    expect(page.events.map((event) => event.metadata)).toEqual([{ retained: true }]);
+  });
 });
