@@ -6,7 +6,9 @@ import type {
   SecurityEvent,
   SecurityEventId,
   SecurityEventOutcome,
-  SecurityEventType
+  SecurityEventType,
+  SessionId,
+  UserId
 } from "../domain/identity.js";
 import { isRecoverySession } from "../sessions/session-kind.js";
 import type { SessionService } from "../sessions/session-service.js";
@@ -83,9 +85,12 @@ const dateQuerySchema = z.coerce.date();
 
 const listSecurityEventsQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
+  actorUserId: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
   eventType: eventTypeQuerySchema,
   outcome: outcomeQuerySchema,
   riskLevel: riskLevelQuerySchema,
+  traceId: z.string().min(1).optional(),
   createdAfter: dateQuerySchema.optional(),
   createdBefore: dateQuerySchema.optional(),
   limit: z.coerce.number().int().positive().max(100).optional()
@@ -186,9 +191,12 @@ export async function registerSecurityEventRoutes(
     try {
       const page = await dependencies.securityEvents.listForUser(session.userId, {
         cursor: query.data.cursor,
+        actorUserId: query.data.actorUserId as UserId | undefined,
+        sessionId: query.data.sessionId as SessionId | undefined,
         eventTypes: query.data.eventType,
         outcomes: query.data.outcome,
         riskLevels: query.data.riskLevel,
+        traceId: query.data.traceId,
         createdAfter: query.data.createdAfter,
         createdBefore: query.data.createdBefore,
         limit: query.data.limit
@@ -228,9 +236,12 @@ export async function registerSecurityEventRoutes(
     try {
       const page = await dependencies.securityEvents.listForUser(session.userId, {
         cursor: query.data.cursor,
+        actorUserId: query.data.actorUserId as UserId | undefined,
+        sessionId: query.data.sessionId as SessionId | undefined,
         eventTypes: [...recoveryEventTypes],
         outcomes: query.data.outcome,
         riskLevels: query.data.riskLevel,
+        traceId: query.data.traceId,
         createdAfter: query.data.createdAfter,
         createdBefore: query.data.createdBefore,
         limit: query.data.limit
