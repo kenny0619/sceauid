@@ -306,4 +306,84 @@ describe("PostgresIdentityStore security events", () => {
     expect(afterPage.events.map((event) => event.metadata)).toEqual([{ side: "after" }]);
     expect(beforePage.events.map((event) => event.metadata)).toEqual([{ side: "before" }]);
   });
+
+  it("filters listed security events by actor and session", async () => {
+    const user = await createTestUser(context);
+    const actor = await context.store.createUser({ displayName: "Actor User" });
+    const otherActor = await context.store.createUser({ displayName: "Other Actor" });
+    const expiresAt = new Date("2026-07-01T12:00:00.000Z");
+    const session = await context.store.createSession({
+      userId: user.id,
+      tokenHash: "token-hash-1",
+      expiresAt
+    });
+    const otherSession = await context.store.createSession({
+      userId: user.id,
+      tokenHash: "token-hash-2",
+      expiresAt
+    });
+
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: actor.id,
+      sessionId: session.id,
+      eventType: "session_revoked",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: { match: true },
+      context: {}
+    });
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: otherActor.id,
+      sessionId: otherSession.id,
+      eventType: "session_revoked",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: { match: false },
+      context: {}
+    });
+
+    const page = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      actorUserId: actor.id,
+      sessionId: session.id,
+      limit: 10
+    });
+
+    expect(page.events.map((event) => event.metadata)).toEqual([{ match: true }]);
+  });
+
+  it("filters listed security events by trace id", async () => {
+    const user = await createTestUser(context);
+
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_failed",
+      outcome: "failure",
+      riskLevel: "medium",
+      metadata: { match: true },
+      context: { traceId: "trace-match" }
+    });
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_failed",
+      outcome: "failure",
+      riskLevel: "medium",
+      metadata: { match: false },
+      context: { traceId: "trace-other" }
+    });
+
+    const page = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      traceId: "trace-match",
+      limit: 10
+    });
+
+    expect(page.events.map((event) => event.metadata)).toEqual([{ match: true }]);
+  });
 });

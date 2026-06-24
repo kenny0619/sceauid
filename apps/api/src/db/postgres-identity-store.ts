@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import {
   type RecoveryRequestId,
   type SecurityEventId,
@@ -371,6 +371,8 @@ export class PostgresIdentityStore implements IdentityStore {
   async listSecurityEventsForUser(filter: SecurityEventFilter) {
     const conditions = [
       ...(filter.userId ? [eq(securityEvents.userId, filter.userId)] : []),
+      ...(filter.actorUserId ? [eq(securityEvents.actorUserId, filter.actorUserId)] : []),
+      ...(filter.sessionId ? [eq(securityEvents.sessionId, filter.sessionId)] : []),
       ...(filter.eventTypes && filter.eventTypes.length > 0
         ? [inArray(securityEvents.eventType, filter.eventTypes)]
         : []),
@@ -379,6 +381,9 @@ export class PostgresIdentityStore implements IdentityStore {
         : []),
       ...(filter.riskLevels && filter.riskLevels.length > 0
         ? [inArray(securityEvents.riskLevel, filter.riskLevels)]
+        : []),
+      ...(filter.traceId
+        ? [eq(sql<string>`${securityEvents.context}->>'traceId'`, filter.traceId)]
         : []),
       ...(filter.createdAfter ? [gte(securityEvents.createdAt, filter.createdAfter)] : []),
       ...(filter.createdBefore ? [lte(securityEvents.createdAt, filter.createdBefore)] : []),
