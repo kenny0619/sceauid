@@ -184,6 +184,8 @@ export const securityEvents = pgTable(
       table.userId,
       table.createdAt
     ),
+    actorUserIdIdx: index("security_events_actor_user_id_idx").on(table.actorUserId),
+    sessionIdIdx: index("security_events_session_id_idx").on(table.sessionId),
     eventTypeIdx: index("security_events_event_type_idx").on(table.eventType),
     riskLevelIdx: index("security_events_risk_level_idx").on(table.riskLevel)
   })
