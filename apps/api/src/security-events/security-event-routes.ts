@@ -79,11 +79,15 @@ const eventTypeQuerySchema = multiValueQuerySchema(securityEventTypes);
 const outcomeQuerySchema = multiValueQuerySchema(securityEventOutcomes);
 const riskLevelQuerySchema = multiValueQuerySchema(riskLevels);
 
+const dateQuerySchema = z.coerce.date();
+
 const listSecurityEventsQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   eventType: eventTypeQuerySchema,
   outcome: outcomeQuerySchema,
   riskLevel: riskLevelQuerySchema,
+  createdAfter: dateQuerySchema.optional(),
+  createdBefore: dateQuerySchema.optional(),
   limit: z.coerce.number().int().positive().max(100).optional()
 });
 
@@ -185,6 +189,8 @@ export async function registerSecurityEventRoutes(
         eventTypes: query.data.eventType,
         outcomes: query.data.outcome,
         riskLevels: query.data.riskLevel,
+        createdAfter: query.data.createdAfter,
+        createdBefore: query.data.createdBefore,
         limit: query.data.limit
       });
 
@@ -225,6 +231,8 @@ export async function registerSecurityEventRoutes(
         eventTypes: [...recoveryEventTypes],
         outcomes: query.data.outcome,
         riskLevels: query.data.riskLevel,
+        createdAfter: query.data.createdAfter,
+        createdBefore: query.data.createdBefore,
         limit: query.data.limit
       });
 
