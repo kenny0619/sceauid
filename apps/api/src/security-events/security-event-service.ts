@@ -32,6 +32,8 @@ export type ListSecurityEventsInput = {
   eventTypes?: SecurityEventType[];
   outcomes?: SecurityEventOutcome[];
   riskLevels?: RiskLevel[];
+  createdAfter?: Date;
+  createdBefore?: Date;
   limit?: number;
 };
 
@@ -160,6 +162,8 @@ export class DefaultSecurityEventService implements SecurityEventService {
       eventTypes: input.eventTypes?.length ? input.eventTypes : undefined,
       outcomes: input.outcomes?.length ? input.outcomes : undefined,
       riskLevels: input.riskLevels?.length ? input.riskLevels : undefined,
+      createdAfter: input.createdAfter,
+      createdBefore: input.createdBefore,
       limit: normalizeLimit(input.limit)
     });
 

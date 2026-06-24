@@ -400,6 +400,39 @@ describe("security event routes", () => {
     ]);
   });
 
+  it("filters security events by created-at range", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?createdAfter=2026-06-01T00:00:00.000Z&createdBefore=2026-06-02T00:00:00.000Z",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls).toEqual([
+      {
+        userId,
+        input: {
+          cursor: undefined,
+          eventTypes: undefined,
+          outcomes: undefined,
+          riskLevels: undefined,
+          createdAfter: new Date("2026-06-01T00:00:00.000Z"),
+          createdBefore: new Date("2026-06-02T00:00:00.000Z"),
+          limit: undefined
+        }
+      }
+    ]);
+  });
+
   it("lists recovery events with the recovery event type preset", async () => {
     const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
     const app = createApp({
@@ -459,6 +492,29 @@ describe("security event routes", () => {
         }
       ],
       nextCursor: null
+    });
+  });
+
+  it("filters recovery events by created-at range", async () => {
+    const listCalls: Array<{ userId: UserId; input?: ListSecurityEventsInput }> = [];
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event],
+      listCalls
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/recovery/events?createdAfter=2026-06-01T00:00:00.000Z&createdBefore=2026-06-02T00:00:00.000Z",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(listCalls[0]?.input).toMatchObject({
+      createdAfter: new Date("2026-06-01T00:00:00.000Z"),
+      createdBefore: new Date("2026-06-02T00:00:00.000Z")
     });
   });
 
@@ -615,6 +671,27 @@ describe("security event routes", () => {
     const response = await app.inject({
       method: "GET",
       url: "/v1/security-events?outcome=maybe&riskLevel=critical",
+      cookies: {
+        sceauid_session: "session-token"
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "invalid_request",
+      message: "Query parameters did not match the security event list schema"
+    });
+  });
+
+  it("rejects invalid created-at filters", async () => {
+    const app = createApp({
+      authenticatedSession: session,
+      events: [event]
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/security-events?createdAfter=not-a-date",
       cookies: {
         sceauid_session: "session-token"
       }

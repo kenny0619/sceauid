@@ -264,4 +264,46 @@ describe("PostgresIdentityStore security events", () => {
       "suspicious_activity_flagged"
     ]);
   });
+
+  it("filters listed security events by created-at window", async () => {
+    const user = await createTestUser(context);
+
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "signup_started",
+      outcome: "pending",
+      riskLevel: "low",
+      metadata: { side: "before" },
+      context: {}
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const boundary = new Date();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await context.store.createSecurityEvent({
+      userId: user.id,
+      actorUserId: user.id,
+      sessionId: null,
+      eventType: "login_succeeded",
+      outcome: "success",
+      riskLevel: "low",
+      metadata: { side: "after" },
+      context: {}
+    });
+
+    const afterPage = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      createdAfter: boundary,
+      limit: 10
+    });
+    const beforePage = await context.store.listSecurityEventsForUser({
+      userId: user.id,
+      createdBefore: boundary,
+      limit: 10
+    });
+
+    expect(afterPage.events.map((event) => event.metadata)).toEqual([{ side: "after" }]);
+    expect(beforePage.events.map((event) => event.metadata)).toEqual([{ side: "before" }]);
+  });
 });

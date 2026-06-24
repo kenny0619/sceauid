@@ -139,6 +139,8 @@ export type SecurityEventFilter = {
   eventTypes?: SecurityEventType[];
   outcomes?: SecurityEventOutcome[];
   riskLevels?: RiskLevel[];
+  createdAfter?: Date;
+  createdBefore?: Date;
   cursor?: SecurityEventCursor;
   limit: number;
 };

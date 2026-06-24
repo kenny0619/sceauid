@@ -217,6 +217,8 @@ export type ListSecurityEventsInput = {
   eventTypes?: string[];
   outcomes?: Array<"failure" | "pending" | "success">;
   riskLevels?: Array<"high" | "low" | "medium">;
+  createdAfter?: Date | string;
+  createdBefore?: Date | string;
   limit?: number;
 };
 
@@ -230,6 +232,18 @@ export type ListSecurityEventsResponse = {
 export type SecurityEventResponse = {
   event: ListedSecurityEvent;
 };
+
+function appendDateQueryParam(
+  searchParams: URLSearchParams,
+  name: string,
+  value: Date | string | undefined
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  searchParams.set(name, value instanceof Date ? value.toISOString() : value);
+}
 
 export type ListedPasskey = {
   id: string;
@@ -407,6 +421,9 @@ export class SceauIDClient {
       searchParams.append("riskLevel", riskLevel);
     }
 
+    appendDateQueryParam(searchParams, "createdAfter", input.createdAfter);
+    appendDateQueryParam(searchParams, "createdBefore", input.createdBefore);
+
     const query = searchParams.toString();
 
     return this.request(`/v1/security-events${query ? `?${query}` : ""}`);
@@ -434,6 +451,9 @@ export class SceauIDClient {
     for (const riskLevel of input.riskLevels ?? []) {
       searchParams.append("riskLevel", riskLevel);
     }
+
+    appendDateQueryParam(searchParams, "createdAfter", input.createdAfter);
+    appendDateQueryParam(searchParams, "createdBefore", input.createdBefore);
 
     const query = searchParams.toString();
 

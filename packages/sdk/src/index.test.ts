@@ -315,6 +315,8 @@ describe("SceauIDClient", () => {
       eventTypes: ["login_failed", "session_revoked"],
       outcomes: ["failure"],
       riskLevels: ["medium", "high"],
+      createdAfter: new Date("2026-06-01T00:00:00.000Z"),
+      createdBefore: "2026-06-02T00:00:00.000Z",
       limit: 10
     });
 
@@ -330,7 +332,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/security-events?limit=10&cursor=current-page-token&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high"
+        url: "https://identity.example.com/v1/security-events?limit=10&cursor=current-page-token&eventType=login_failed&eventType=session_revoked&outcome=failure&riskLevel=medium&riskLevel=high&createdAfter=2026-06-01T00%3A00%3A00.000Z&createdBefore=2026-06-02T00%3A00%3A00.000Z"
       }
     ]);
   });
@@ -404,6 +406,8 @@ describe("SceauIDClient", () => {
       cursor: "current-page-token",
       outcomes: ["success"],
       riskLevels: ["medium"],
+      createdAfter: "2026-06-01T00:00:00.000Z",
+      createdBefore: new Date("2026-06-02T00:00:00.000Z"),
       limit: 10
     });
 
@@ -418,7 +422,7 @@ describe("SceauIDClient", () => {
           },
           method: "GET"
         },
-        url: "https://identity.example.com/v1/recovery/events?limit=10&cursor=current-page-token&outcome=success&riskLevel=medium"
+        url: "https://identity.example.com/v1/recovery/events?limit=10&cursor=current-page-token&outcome=success&riskLevel=medium&createdAfter=2026-06-01T00%3A00%3A00.000Z&createdBefore=2026-06-02T00%3A00%3A00.000Z"
       }
     ]);
   });

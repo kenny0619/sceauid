@@ -138,6 +138,33 @@ describe("DefaultSecurityEventService", () => {
     ]);
   });
 
+  it("passes created-at filters to storage", async () => {
+    const { store, listCalls } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+    const userId = "user-id" as UserId;
+    const createdAfter = new Date("2026-06-01T12:00:00.000Z");
+    const createdBefore = new Date("2026-06-02T12:00:00.000Z");
+
+    await service.listForUser(userId, {
+      createdAfter,
+      createdBefore,
+      limit: 25
+    });
+
+    expect(listCalls).toEqual([
+      {
+        userId,
+        eventTypes: undefined,
+        outcomes: undefined,
+        riskLevels: undefined,
+        createdAfter,
+        createdBefore,
+        cursor: undefined,
+        limit: 25
+      }
+    ]);
+  });
+
   it("returns an opaque cursor for the next page", async () => {
     const listCalls: SecurityEventFilter[] = [];
     const nextCursor = {

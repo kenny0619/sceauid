@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import {
   type RecoveryRequestId,
   type SecurityEventId,
@@ -380,6 +380,8 @@ export class PostgresIdentityStore implements IdentityStore {
       ...(filter.riskLevels && filter.riskLevels.length > 0
         ? [inArray(securityEvents.riskLevel, filter.riskLevels)]
         : []),
+      ...(filter.createdAfter ? [gte(securityEvents.createdAt, filter.createdAfter)] : []),
+      ...(filter.createdBefore ? [lte(securityEvents.createdAt, filter.createdBefore)] : []),
       ...(filter.cursor
         ? [
             or(
