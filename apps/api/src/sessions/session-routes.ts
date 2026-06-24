@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import type { Session, UserId } from "../domain/identity.js";
+import type { RequestContext, Session, UserId } from "../domain/identity.js";
 import type { IdentityStore } from "../domain/storage.js";
+import { resolveRequestAuditContext } from "../http/request-audit-context.js";
 import { type SessionCookieOptions, clearSessionCookie } from "../http/session-cookie.js";
 import type { SecurityEventService } from "../security-events/security-event-service.js";
 import { isFreshAuthentication, rejectFreshAuthRequired } from "./fresh-auth.js";
@@ -39,6 +40,7 @@ async function recordSessionRevoked(
   input: {
     actorSessionId: string;
     actorUserId: UserId;
+    context?: RequestContext;
     reason: "current_session_logout" | "targeted_revoke";
     targetSession: Session;
   }
@@ -58,7 +60,8 @@ async function recordSessionRevoked(
         targetDeviceLabel: input.targetSession.deviceLabel,
         targetExpiresAt: input.targetSession.expiresAt.toISOString(),
         targetUserAgent: input.targetSession.userAgent
-      }
+      },
+      ...(input.context ? { context: input.context } : {})
     })
     .catch(() => undefined);
 }
@@ -171,6 +174,7 @@ export async function registerSessionRoutes(
         await recordSessionRevoked(dependencies.securityEvents, {
           actorSessionId: session.id,
           actorUserId: session.userId,
+          context: resolveRequestAuditContext(request),
           reason: "current_session_logout",
           targetSession: session
         });
@@ -230,6 +234,7 @@ export async function registerSessionRoutes(
     await recordSessionRevoked(dependencies.securityEvents, {
       actorSessionId: currentSession.id,
       actorUserId: currentSession.userId,
+      context: resolveRequestAuditContext(request),
       reason: "targeted_revoke",
       targetSession
     });

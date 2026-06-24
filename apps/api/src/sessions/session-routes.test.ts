@@ -40,6 +40,13 @@ const staleSession: Session = {
   authenticatedAt: new Date("2026-06-01T12:49:59.000Z")
 };
 
+function expectAuditContext(): unknown {
+  return expect.objectContaining({
+    ipHash: expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    traceId: expect.any(String)
+  });
+}
+
 function createApp(options: {
   authenticatedSession?: Session | null;
   foundUser?: User | null;
@@ -372,7 +379,8 @@ describe("session routes", () => {
           targetDeviceLabel: "Safari on macOS",
           targetExpiresAt: "2026-07-01T12:00:00.000Z",
           targetUserAgent: "test-agent"
-        }
+        },
+        context: expectAuditContext()
       }
     ]);
   });
@@ -447,7 +455,8 @@ describe("session routes", () => {
         metadata: expect.objectContaining({
           reason: "current_session_logout",
           targetDeviceLabel: "Recovery session"
-        })
+        }),
+        context: expectAuditContext()
       })
     ]);
   });
@@ -495,7 +504,8 @@ describe("session routes", () => {
           targetDeviceLabel: "Chrome on Windows",
           targetExpiresAt: "2026-07-01T12:00:00.000Z",
           targetUserAgent: "test-agent"
-        }
+        },
+        context: expectAuditContext()
       }
     ]);
   });
@@ -568,7 +578,8 @@ describe("session routes", () => {
           targetDeviceLabel: "Safari on macOS",
           targetExpiresAt: "2026-07-01T12:00:00.000Z",
           targetUserAgent: "test-agent"
-        }
+        },
+        context: expectAuditContext()
       }
     ]);
   });
