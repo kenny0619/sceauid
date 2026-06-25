@@ -106,6 +106,7 @@ export type IdentityStore = {
   createSecurityEvent(input: CreateSecurityEventInput): Promise<SecurityEvent>;
   findSecurityEventForUser(userId: UserId, eventId: SecurityEventId): Promise<SecurityEvent | null>;
   listSecurityEventsForUser(filter: SecurityEventFilter): Promise<SecurityEventPage>;
+  deleteSecurityEventsBefore(cutoff: Date, limit: number): Promise<number>;
 };
 
 export type ChallengePurpose = "passkey_registration" | "passkey_login" | "email_recovery";

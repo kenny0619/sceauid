@@ -11,10 +11,15 @@ function createFakeStore() {
   const createdEvents: CreateSecurityEventInput[] = [];
   const findCalls: Array<{ userId: UserId; eventId: SecurityEventId }> = [];
   const listCalls: SecurityEventFilter[] = [];
+  const deleteCalls: Array<{ cutoff: Date; limit: number }> = [];
+  const deleteResults: number[] = [];
 
   const store: Pick<
     IdentityStore,
-    "createSecurityEvent" | "findSecurityEventForUser" | "listSecurityEventsForUser"
+    | "createSecurityEvent"
+    | "findSecurityEventForUser"
+    | "listSecurityEventsForUser"
+    | "deleteSecurityEventsBefore"
   > = {
     async createSecurityEvent(input) {
       createdEvents.push(input);
@@ -32,10 +37,14 @@ function createFakeStore() {
     async listSecurityEventsForUser(filter) {
       listCalls.push(filter);
       return { events: [] as SecurityEvent[] };
+    },
+    async deleteSecurityEventsBefore(cutoff, limit) {
+      deleteCalls.push({ cutoff, limit });
+      return deleteResults.shift() ?? 0;
     }
   };
 
-  return { store, createdEvents, findCalls, listCalls };
+  return { store, createdEvents, findCalls, listCalls, deleteCalls, deleteResults };
 }
 
 describe("DefaultSecurityEventService", () => {
@@ -219,6 +228,9 @@ describe("DefaultSecurityEventService", () => {
       async findSecurityEventForUser() {
         return null;
       },
+      async deleteSecurityEventsBefore() {
+        return 0;
+      },
       async listSecurityEventsForUser(filter: SecurityEventFilter) {
         listCalls.push(filter);
         return {
@@ -228,7 +240,10 @@ describe("DefaultSecurityEventService", () => {
       }
     } satisfies Pick<
       IdentityStore,
-      "createSecurityEvent" | "findSecurityEventForUser" | "listSecurityEventsForUser"
+      | "createSecurityEvent"
+      | "findSecurityEventForUser"
+      | "listSecurityEventsForUser"
+      | "deleteSecurityEventsBefore"
     >;
     const service = new DefaultSecurityEventService(store);
 
@@ -237,5 +252,56 @@ describe("DefaultSecurityEventService", () => {
 
     expect(firstPage.nextCursor).toBeTypeOf("string");
     expect(listCalls[1]?.cursor).toEqual(nextCursor);
+  });
+
+  it("prunes old security events in batches until complete", async () => {
+    const { store, deleteCalls, deleteResults } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+    const cutoff = new Date("2026-06-01T12:00:00.000Z");
+    deleteResults.push(2, 1);
+
+    const result = await service.pruneBefore(cutoff, {
+      batchSize: 2,
+      maxBatches: 5
+    });
+
+    expect(result).toEqual({
+      cutoff,
+      deletedCount: 3,
+      batches: 2,
+      complete: true
+    });
+    expect(deleteCalls).toEqual([
+      { cutoff, limit: 2 },
+      { cutoff, limit: 2 }
+    ]);
+  });
+
+  it("marks pruning incomplete when the max batch count is reached", async () => {
+    const { store, deleteResults } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+    const cutoff = new Date("2026-06-01T12:00:00.000Z");
+    deleteResults.push(2, 2);
+
+    await expect(
+      service.pruneBefore(cutoff, {
+        batchSize: 2,
+        maxBatches: 2
+      })
+    ).resolves.toEqual({
+      cutoff,
+      deletedCount: 4,
+      batches: 2,
+      complete: false
+    });
+  });
+
+  it("rejects invalid retention cutoffs", async () => {
+    const { store } = createFakeStore();
+    const service = new DefaultSecurityEventService(store);
+
+    await expect(service.pruneBefore(new Date("invalid"))).rejects.toThrow(
+      "Security event retention cutoff is invalid"
+    );
   });
 });

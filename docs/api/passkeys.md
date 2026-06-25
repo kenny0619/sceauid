@@ -644,6 +644,8 @@ Events outside the authenticated user are returned as `404` with `error: "securi
 
 These events are intended to support account timelines, user-facing security history, investigation workflows, and future webhook delivery.
 
+Use the security-event retention prune command described in `docs/operations/security-event-retention.md` to delete events outside the configured retention window.
+
 ## Integration Notes
 
 - Challenge IDs (`registrationId` and `loginId`) are short-lived and single-use.

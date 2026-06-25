@@ -30,11 +30,12 @@ REDIS_URL=redis://redis.internal:6379
 SESSION_COOKIE_NAME=sceauid_session
 APP_ORIGIN=https://app.example.com
 TRUST_PROXY=false
+SECURITY_EVENT_RETENTION_DAYS=365
 WEBAUTHN_RP_NAME=SceauID
 WEBAUTHN_RP_ID=app.example.com
 ```
 
-`SESSION_COOKIE_NAME` and `WEBAUTHN_RP_NAME` still have defaults in production, but deployments can override them to match their application boundary and brand.
+`SESSION_COOKIE_NAME`, `SECURITY_EVENT_RETENTION_DAYS`, and `WEBAUTHN_RP_NAME` still have defaults in production, but deployments can override them to match their application boundary, retention policy, and brand.
 
 ## Reverse Proxies
 
