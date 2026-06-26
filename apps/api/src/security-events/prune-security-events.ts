@@ -2,12 +2,13 @@ import { pathToFileURL } from "node:url";
 import { type AppConfig, loadConfig } from "../config.js";
 import { createDatabaseClient } from "../db/client.js";
 import { PostgresIdentityStore } from "../db/postgres-identity-store.js";
+import { readOptionalPositiveInteger, resolveRetentionCutoff } from "../maintenance/retention.js";
 import {
   DefaultSecurityEventService,
   type PruneSecurityEventsInput
 } from "./security-event-service.js";
 
-const dayMs = 24 * 60 * 60 * 1000;
+export { resolveRetentionCutoff } from "../maintenance/retention.js";
 
 export type PruneSecurityEventsRuntimeOptions = PruneSecurityEventsInput & {
   now?: Date;
@@ -20,26 +21,6 @@ export type PruneSecurityEventsCommandResult = {
   batches: number;
   complete: boolean;
 };
-
-function readOptionalPositiveInteger(env: NodeJS.ProcessEnv, name: string): number | undefined {
-  const value = env[name];
-
-  if (value === undefined || value === "") {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new Error(`${name} must be a positive integer`);
-  }
-
-  return parsed;
-}
-
-export function resolveRetentionCutoff(now: Date, retentionDays: number): Date {
-  return new Date(now.getTime() - retentionDays * dayMs);
-}
 
 export function resolvePruneOptions(env: NodeJS.ProcessEnv): PruneSecurityEventsInput {
   return {
