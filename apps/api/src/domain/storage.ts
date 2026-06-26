@@ -80,6 +80,7 @@ export type IdentityStore = {
   listSessionsForUser(userId: UserId): Promise<Session[]>;
   revokeSession(sessionId: SessionId, revokedAt: Date): Promise<void>;
   revokeUserSessions(userId: UserId, revokedAt: Date): Promise<void>;
+  deleteStaleSessions(cutoff: Date, limit: number): Promise<number>;
 
   createRecoveryCode(input: CreateRecoveryCodeInput): Promise<RecoveryCode>;
   countUnusedRecoveryCodesForUser(userId: UserId): Promise<number>;
@@ -102,6 +103,7 @@ export type IdentityStore = {
     cancelledAt: Date
   ): Promise<RecoveryRequest | null>;
   completeRecoveryRequest(userId: UserId, completedAt: Date): Promise<void>;
+  deleteStaleRecoveryRequests(cutoff: Date, limit: number): Promise<number>;
 
   createSecurityEvent(input: CreateSecurityEventInput): Promise<SecurityEvent>;
   findSecurityEventForUser(userId: UserId, eventId: SecurityEventId): Promise<SecurityEvent | null>;

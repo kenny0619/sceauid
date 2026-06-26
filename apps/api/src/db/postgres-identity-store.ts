@@ -187,6 +187,22 @@ export class PostgresIdentityStore implements IdentityStore {
     await this.db.update(sessions).set({ revokedAt }).where(eq(sessions.userId, userId));
   }
 
+  async deleteStaleSessions(cutoff: Date, limit: number) {
+    const sessionsToDelete = this.db
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(or(lt(sessions.expiresAt, cutoff), lt(sessions.revokedAt, cutoff)))
+      .orderBy(asc(sessions.expiresAt), asc(sessions.id))
+      .limit(limit);
+
+    const deleted = await this.db
+      .delete(sessions)
+      .where(inArray(sessions.id, sessionsToDelete))
+      .returning({ id: sessions.id });
+
+    return deleted.length;
+  }
+
   async createRecoveryCode(input: CreateRecoveryCodeInput) {
     const [code] = await this.db
       .insert(recoveryCodes)
@@ -338,6 +354,30 @@ export class PostgresIdentityStore implements IdentityStore {
         completedAt
       })
       .where(and(eq(recoveryRequests.userId, userId), eq(recoveryRequests.status, "pending")));
+  }
+
+  async deleteStaleRecoveryRequests(cutoff: Date, limit: number) {
+    const requestsToDelete = this.db
+      .select({ id: recoveryRequests.id })
+      .from(recoveryRequests)
+      .where(
+        or(
+          and(eq(recoveryRequests.status, "completed"), lt(recoveryRequests.completedAt, cutoff)),
+          and(eq(recoveryRequests.status, "cancelled"), lt(recoveryRequests.expiresAt, cutoff)),
+          and(eq(recoveryRequests.status, "expired"), lt(recoveryRequests.expiresAt, cutoff)),
+          and(eq(recoveryRequests.status, "pending"), lt(recoveryRequests.expiresAt, cutoff)),
+          and(eq(recoveryRequests.status, "verified"), lt(recoveryRequests.expiresAt, cutoff))
+        )
+      )
+      .orderBy(asc(recoveryRequests.expiresAt), asc(recoveryRequests.id))
+      .limit(limit);
+
+    const deleted = await this.db
+      .delete(recoveryRequests)
+      .where(inArray(recoveryRequests.id, requestsToDelete))
+      .returning({ id: recoveryRequests.id });
+
+    return deleted.length;
   }
 
   async createSecurityEvent(input: CreateSecurityEventInput) {

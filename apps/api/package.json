@@ -10,6 +10,7 @@
     "db:migrate:kit": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "dev": "tsx watch src/main.ts",
+    "identity:prune-stale": "tsx src/maintenance/prune-stale-identity-records.ts",
     "lint": "tsc -p tsconfig.json --noEmit",
     "security-events:prune": "tsx src/security-events/prune-security-events.ts",
     "test": "vitest run --passWithNoTests",

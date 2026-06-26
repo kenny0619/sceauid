@@ -177,4 +177,38 @@ describe("PostgresIdentityStore recovery", () => {
       context.store.cancelActiveRecoveryRequest(request.id, cancelledAt)
     ).resolves.toBeNull();
   });
+
+  it("deletes stale recovery requests in bounded batches", async () => {
+    const user = await createTestUser(context);
+    const cutoff = new Date("2026-06-01T12:00:00.000Z");
+    const completedAt = new Date("2026-05-01T12:00:00.000Z");
+    const oldCompleted = await context.store.createRecoveryRequest({
+      userId: user.id,
+      riskLevel: "medium",
+      expiresAt: new Date("2026-05-01T12:05:00.000Z")
+    });
+    const oldPending = await context.store.createRecoveryRequest({
+      userId: user.id,
+      riskLevel: "high",
+      expiresAt: new Date("2026-05-15T12:00:00.000Z")
+    });
+    const active = await context.store.createRecoveryRequest({
+      userId: user.id,
+      riskLevel: "low",
+      expiresAt: new Date("2026-07-01T12:00:00.000Z")
+    });
+
+    await context.store.completeActiveRecoveryRequest(oldCompleted.id, completedAt);
+
+    await expect(context.store.deleteStaleRecoveryRequests(cutoff, 1)).resolves.toBe(1);
+    await expect(context.store.deleteStaleRecoveryRequests(cutoff, 1)).resolves.toBe(1);
+    await expect(context.store.deleteStaleRecoveryRequests(cutoff, 1)).resolves.toBe(0);
+
+    await expect(context.store.findRecoveryRequestById(oldCompleted.id)).resolves.toBeNull();
+    await expect(context.store.findRecoveryRequestById(oldPending.id)).resolves.toBeNull();
+    await expect(context.store.findRecoveryRequestById(active.id)).resolves.toMatchObject({
+      id: active.id,
+      status: "pending"
+    });
+  });
 });

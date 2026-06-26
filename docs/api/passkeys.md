@@ -450,6 +450,8 @@ The response does not expose token hashes or IP hashes. Recovery sessions are sh
 
 Recovery sessions are rejected by normal authenticated endpoints with `403` and `error: "standard_session_required"`. They are only accepted by recovery handoff endpoints that explicitly ask for a recovery session token.
 
+Use the stale identity maintenance command described in `docs/operations/stale-identity-maintenance.md` to delete expired or revoked session records outside the configured retention window.
+
 ## Revoke A Session
 
 `DELETE /v1/sessions/:sessionId`
@@ -652,4 +654,5 @@ Use the security-event retention prune command described in `docs/operations/sec
 - WebAuthn binary values should be encoded as base64url strings over HTTP.
 - The API validates the relying party ID and origin during finish calls.
 - Sessions are server-side records and can be revoked independently of the cookie.
+- Expired sessions and stale recovery requests should be pruned with the stale identity maintenance command.
 - Browser clients should call the SDK or API with credentials enabled so cookies are sent and received.
