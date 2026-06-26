@@ -11,6 +11,8 @@ describe("loadConfig", () => {
       SESSION_COOKIE_NAME: "sceauid_session",
       APP_ORIGIN: "http://localhost:3000",
       TRUST_PROXY: false,
+      SESSION_RECORD_RETENTION_DAYS: 90,
+      RECOVERY_REQUEST_RETENTION_DAYS: 90,
       SECURITY_EVENT_RETENTION_DAYS: 365,
       WEBAUTHN_RP_NAME: "SceauID",
       WEBAUTHN_RP_ID: "localhost"
@@ -27,6 +29,8 @@ describe("loadConfig", () => {
         SESSION_COOKIE_NAME: "identity_session",
         APP_ORIGIN: "https://app.example.com",
         TRUST_PROXY: "true",
+        SESSION_RECORD_RETENTION_DAYS: "180",
+        RECOVERY_REQUEST_RETENTION_DAYS: "45",
         SECURITY_EVENT_RETENTION_DAYS: "730",
         WEBAUTHN_RP_NAME: "Example App",
         WEBAUTHN_RP_ID: "app.example.com"
@@ -39,6 +43,8 @@ describe("loadConfig", () => {
       SESSION_COOKIE_NAME: "identity_session",
       APP_ORIGIN: "https://app.example.com",
       TRUST_PROXY: true,
+      SESSION_RECORD_RETENTION_DAYS: 180,
+      RECOVERY_REQUEST_RETENTION_DAYS: 45,
       SECURITY_EVENT_RETENTION_DAYS: 730,
       WEBAUTHN_RP_NAME: "Example App",
       WEBAUTHN_RP_ID: "app.example.com"
@@ -46,6 +52,8 @@ describe("loadConfig", () => {
   });
 
   it("rejects invalid security event retention windows", () => {
+    expect(() => loadConfig({ SESSION_RECORD_RETENTION_DAYS: "0" })).toThrow();
+    expect(() => loadConfig({ RECOVERY_REQUEST_RETENTION_DAYS: "3651" })).toThrow();
     expect(() => loadConfig({ SECURITY_EVENT_RETENTION_DAYS: "0" })).toThrow();
     expect(() => loadConfig({ SECURITY_EVENT_RETENTION_DAYS: "3651" })).toThrow();
   });
