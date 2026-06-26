@@ -77,4 +77,39 @@ describe("PostgresIdentityStore sessions", () => {
       true
     );
   });
+
+  it("deletes stale sessions in bounded batches", async () => {
+    const user = await createTestUser(context);
+    const cutoff = new Date("2026-06-01T12:00:00.000Z");
+    const oldExpiresAt = new Date("2026-05-01T12:00:00.000Z");
+    const futureExpiresAt = new Date("2026-07-01T12:00:00.000Z");
+    const revokedAt = new Date("2026-05-15T12:00:00.000Z");
+
+    const expired = await context.store.createSession({
+      userId: user.id,
+      tokenHash: "expired-token",
+      expiresAt: oldExpiresAt
+    });
+    const revoked = await context.store.createSession({
+      userId: user.id,
+      tokenHash: "revoked-token",
+      expiresAt: futureExpiresAt
+    });
+    const active = await context.store.createSession({
+      userId: user.id,
+      tokenHash: "active-token",
+      expiresAt: futureExpiresAt
+    });
+    await context.store.revokeSession(revoked.id, revokedAt);
+
+    await expect(context.store.deleteStaleSessions(cutoff, 1)).resolves.toBe(1);
+    await expect(context.store.deleteStaleSessions(cutoff, 1)).resolves.toBe(1);
+    await expect(context.store.deleteStaleSessions(cutoff, 1)).resolves.toBe(0);
+
+    await expect(context.store.findSessionByTokenHash(expired.tokenHash)).resolves.toBeNull();
+    await expect(context.store.findSessionByTokenHash(revoked.tokenHash)).resolves.toBeNull();
+    await expect(context.store.findSessionByTokenHash(active.tokenHash)).resolves.toMatchObject({
+      id: active.id
+    });
+  });
 });
